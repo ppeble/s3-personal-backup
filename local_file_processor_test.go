@@ -28,7 +28,7 @@ func (s *LocalProcessorTestSuite) TeardownTest() {
 }
 
 func (s *LocalProcessorTestSuite) Test_Process_Error() {
-	_, err := s.processor.Process("bad_file_path")
+	_, err := s.processor.Gather("bad_file_path")
 
 	s.Require().Error(err)
 }
@@ -36,10 +36,10 @@ func (s *LocalProcessorTestSuite) Test_Process_Error() {
 func (s *LocalProcessorTestSuite) Test_Process_SingleDirSingleFile() {
 	tempFile := s.createTempFile(s.rootDir, "TEST")
 
-	localFileInfo, err := s.processor.Process(s.rootDir)
-
+	localFileInfo, err := s.processor.Gather(s.rootDir)
 	s.Require().NoError(err)
-	s.Equal([]os.FileInfo{tempFile}, localFileInfo[s.rootDir])
+
+	s.compare(tempFile, localFileInfo)
 }
 
 func (s *LocalProcessorTestSuite) Test_Process_SingleDirMultipleFiles() {
@@ -47,18 +47,12 @@ func (s *LocalProcessorTestSuite) Test_Process_SingleDirMultipleFiles() {
 	tempFile2 := s.createTempFile(s.rootDir, "TEST2")
 	tempFile3 := s.createTempFile(s.rootDir, "TEST3")
 
-	localFileInfo, err := s.processor.Process(s.rootDir)
-
+	localFileInfo, err := s.processor.Gather(s.rootDir)
 	s.Require().NoError(err)
 
-	s.Equal(
-		[]os.FileInfo{
-			tempFile1,
-			tempFile2,
-			tempFile3,
-		},
-		localFileInfo[s.rootDir],
-	)
+	s.compare(tempFile1, localFileInfo)
+	s.compare(tempFile2, localFileInfo)
+	s.compare(tempFile3, localFileInfo)
 }
 
 func (s *LocalProcessorTestSuite) Test_Process_TwoDirsSingleFile() {
@@ -67,12 +61,11 @@ func (s *LocalProcessorTestSuite) Test_Process_TwoDirsSingleFile() {
 	innerTempDir := s.createTempDir(s.rootDir, "innerDir")
 	innerTempFile := s.createTempFile(innerTempDir, "innerTestFile")
 
-	localFileInfo, err := s.processor.Process(s.rootDir)
-
+	localFileInfo, err := s.processor.Gather(s.rootDir)
 	s.Require().NoError(err)
 
-	s.Equal([]os.FileInfo{rootDirTempFile}, localFileInfo[s.rootDir], "root dir does not match")
-	s.Equal([]os.FileInfo{innerTempFile}, localFileInfo[innerTempDir], "inner dir does not match")
+	s.compare(rootDirTempFile, localFileInfo)
+	s.compare(innerTempFile, localFileInfo)
 }
 
 func (s *LocalProcessorTestSuite) Test_Process_TwoDirsMultipleFiles() {
@@ -85,29 +78,15 @@ func (s *LocalProcessorTestSuite) Test_Process_TwoDirsMultipleFiles() {
 	innerTempFile2 := s.createTempFile(innerTempDir, "innerTestFile2")
 	innerTempFile3 := s.createTempFile(innerTempDir, "innerTestFile3")
 
-	localFileInfo, err := s.processor.Process(s.rootDir)
-
+	localFileInfo, err := s.processor.Gather(s.rootDir)
 	s.Require().NoError(err)
 
-	s.Equal(
-		[]os.FileInfo{
-			rootDirTempFile1,
-			rootDirTempFile2,
-			rootDirTempFile3,
-		},
-		localFileInfo[s.rootDir],
-		"root dir contents do not match",
-	)
-
-	s.Equal(
-		[]os.FileInfo{
-			innerTempFile1,
-			innerTempFile2,
-			innerTempFile3,
-		},
-		localFileInfo[innerTempDir],
-		"inner dir contents do not match",
-	)
+	s.compare(rootDirTempFile1, localFileInfo)
+	s.compare(rootDirTempFile2, localFileInfo)
+	s.compare(rootDirTempFile3, localFileInfo)
+	s.compare(innerTempFile1, localFileInfo)
+	s.compare(innerTempFile2, localFileInfo)
+	s.compare(innerTempFile3, localFileInfo)
 }
 
 // Test dir format:
@@ -143,27 +122,23 @@ func (s *LocalProcessorTestSuite) Test_Process_MultipleDirsMultipleFilesDifferen
 	nestedTempDir4 := s.createTempDir(nestedTempDir3, "nestedDir4")
 	nestedDir4TempFile1 := s.createTempFile(nestedTempDir4, "nestedDir4TestFile1")
 
-	nestedTempDir5 := s.createTempDir(nestedTempDir3, "nestedDir5")
+	s.createTempDir(nestedTempDir3, "nestedDir5")
 
-	localFileInfo, err := s.processor.Process(s.rootDir)
-
+	localFileInfo, err := s.processor.Gather(s.rootDir)
 	s.Require().NoError(err)
 
-	s.Equal(rootDirTempFile1, localFileInfo[s.rootDir][0])
+	s.compare(rootDirTempFile1, localFileInfo)
 
-	s.Equal(nestedDir1TempFile1, localFileInfo[nestedTempDir1][0])
-	s.Equal(nestedDir1TempFile2, localFileInfo[nestedTempDir1][1])
-	s.Equal(nestedDir1TempFile3, localFileInfo[nestedTempDir1][2])
+	s.compare(nestedDir1TempFile1, localFileInfo)
+	s.compare(nestedDir1TempFile2, localFileInfo)
+	s.compare(nestedDir1TempFile3, localFileInfo)
 
-	s.Equal(nestedDir2TempFile1, localFileInfo[nestedTempDir2][0])
-	s.Equal(nestedDir2TempFile2, localFileInfo[nestedTempDir2][1])
+	s.compare(nestedDir2TempFile1, localFileInfo)
+	s.compare(nestedDir2TempFile2, localFileInfo)
 
-	s.Equal(nestedDir3TempFile1, localFileInfo[nestedTempDir3][0])
+	s.compare(nestedDir3TempFile1, localFileInfo)
 
-	s.Equal(nestedDir4TempFile1, localFileInfo[nestedTempDir4][0])
-
-	_, present := localFileInfo[nestedTempDir5]
-	s.True(present)
+	s.compare(nestedDir4TempFile1, localFileInfo)
 }
 
 func (s *LocalProcessorTestSuite) createTempDir(directory, prefix string) string {
@@ -175,16 +150,24 @@ func (s *LocalProcessorTestSuite) createTempDir(directory, prefix string) string
 	return createdDir
 }
 
-func (s *LocalProcessorTestSuite) createTempFile(directory, prefix string) os.FileInfo {
+func (s *LocalProcessorTestSuite) createTempFile(directory, prefix string) *os.File {
 	tmpFile, err := ioutil.TempFile(directory, prefix)
 	if err != nil {
 		s.T().Fatal(err)
 	}
 
-	tempFileInfo, err := tmpFile.Stat()
+	return tmpFile
+}
+
+func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[string]file) {
+	fi, err := tmpFile.Stat()
 	if err != nil {
 		s.T().Fatal(err)
 	}
 
-	return tempFileInfo
+	expected := newFile(tmpFile.Name(), fi.Size())
+
+	actual, found := data[tmpFile.Name()]
+	s.True(found)
+	s.Equal(expected, actual)
 }

@@ -26,7 +26,7 @@ func main() {
 	localFileProcessor := backup.NewLocalFileProcessor()
 	// Create Remote processor
 
-	processor := backup.NewProcessor(localFileProcessor.Process)
+	processor := backup.NewProcessor(localFileProcessor.Gather)
 
 	processor.Process(targetDir)
 

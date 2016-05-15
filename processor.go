@@ -1,25 +1,23 @@
 package backup
 
-import (
-	"os"
-)
-
 // Make a constructor that accepts methods to call
 // This way we can test this glue package
 // Then in main we pass in real things
 
 type processor struct {
-	localFileProcessor func(string) (map[string][]os.FileInfo, error)
+	gatherLocalFiles  func(string) (map[string]file, error)
+	gatherRemoteFiles func(string) (map[string]file, error)
 	// etc
 }
 
-func NewProcessor(local func(string) (map[string][]os.FileInfo, error)) processor {
+func NewProcessor(localGather, remoteGather func(string) (map[string]file, error)) processor {
 	return processor{
-		localFileProcessor: local,
+		gatherLocalFiles:  localGather,
+		gatherRemoteFiles: remoteGather,
 	}
 }
 
-func (p processor) Process(targetDir string) error {
-	_, err := p.localFileProcessor(targetDir)
+func (p processor) Process(targetLocal, targetRemote string) error {
+	_, err := p.gatherLocalFiles(targetLocal)
 	return err
 }
