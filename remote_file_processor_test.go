@@ -14,14 +14,14 @@ func TestRemoteProcessorTestSuite(t *testing.T) {
 
 type RemoteProcessorTestSuite struct {
 	suite.Suite
-	bucketName string
+	bucket     string
 	listFunc   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
 	removeFunc func(string, string) error
 	putFunc    func(string, string, string, string) (int64, error)
 }
 
 func (s *RemoteProcessorTestSuite) SetupTest() {
-	s.bucketName = "testBucket"
+	s.bucket = "testBucket"
 
 	s.listFunc = func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo)
@@ -40,7 +40,7 @@ func (s *RemoteProcessorTestSuite) Test_Gather_CallsListRemoteObjects() {
 		objectCh := make(chan minio.ObjectInfo, 1)
 		defer close(objectCh)
 
-		s.Equal(s.bucketName, bucket)
+		s.Equal(s.bucket, bucket)
 		s.Equal("", prefix)
 		s.Equal(true, isRecursive)
 
@@ -49,20 +49,18 @@ func (s *RemoteProcessorTestSuite) Test_Gather_CallsListRemoteObjects() {
 		return objectCh
 	}
 
-	processor := NewRemoteFileProcessor(listFunc, s.removeFunc, s.putFunc)
-	_, err := processor.Gather(s.bucketName)
+	processor, _ := NewRemoteFileProcessor(s.bucket, listFunc, s.removeFunc, s.putFunc)
+	_, err := processor.Gather()
 
 	s.Require().NoError(err)
 	s.True(called)
 }
 
-func (s *RemoteProcessorTestSuite) Test_Gather_ErrorBlankBucketName() {
+func (s *RemoteProcessorTestSuite) Test_Gather_ReturnsErrorOnlyForFailedObjects() {
+	called := false
 	expectedErr := errors.New("asplode")
 
-	listFuncWithError := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
-		//FIXME I don't understand how this works in the minio example? The
-		// error case does basically what I am doing but I thought that senders
-		// blocked until a receiver was present. How does this work unbuffered?
+	listFunc := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo, 1)
 		defer close(objectCh)
 
@@ -70,14 +68,22 @@ func (s *RemoteProcessorTestSuite) Test_Gather_ErrorBlankBucketName() {
 			Err: expectedErr,
 		}
 
+		called = true
 		return objectCh
 	}
 
-	processor := NewRemoteFileProcessor(listFuncWithError, s.removeFunc, s.putFunc)
-	_, err := processor.Gather("")
+	processor, _ := NewRemoteFileProcessor(s.bucket, listFunc, s.removeFunc, s.putFunc)
+	_, err := processor.Gather()
 
 	s.Require().Error(err)
+	s.True(called)
 	s.Equal(expectedErr, err)
+}
+
+func (s *RemoteProcessorTestSuite) Test_New_ErrorBlankBucketName() {
+	_, err := NewRemoteFileProcessor("", s.listFunc, s.removeFunc, s.putFunc)
+	s.Error(err)
+	s.Equal(errors.New("'NewRemoteFileProcessor' error: bucket cannot be missing"), err)
 }
 
 func (s *RemoteProcessorTestSuite) Test_Gather_SingleFile() {
@@ -93,8 +99,8 @@ func (s *RemoteProcessorTestSuite) Test_Gather_SingleFile() {
 		return objectCh
 	}
 
-	processor := NewRemoteFileProcessor(listFunc, s.removeFunc, s.putFunc)
-	data, err := processor.Gather(s.bucketName)
+	processor, _ := NewRemoteFileProcessor(s.bucket, listFunc, s.removeFunc, s.putFunc)
+	data, err := processor.Gather()
 
 	s.Require().NoError(err)
 	s.Equal(newFile("test", 100), data["test"])
@@ -123,8 +129,8 @@ func (s *RemoteProcessorTestSuite) Test_Gather_MultipleFiles() {
 		return objectCh
 	}
 
-	processor := NewRemoteFileProcessor(listFunc, s.removeFunc, s.putFunc)
-	data, err := processor.Gather(s.bucketName)
+	processor, _ := NewRemoteFileProcessor(s.bucket, listFunc, s.removeFunc, s.putFunc)
+	data, err := processor.Gather()
 
 	s.Require().NoError(err)
 	s.Equal(newFile("test1", 100), data["test1"])
@@ -135,14 +141,14 @@ func (s *RemoteProcessorTestSuite) Test_Gather_MultipleFiles() {
 func (s *RemoteProcessorTestSuite) Test_Remove_Happy() {
 	called := false
 	removeFunc := func(bucket, file string) error {
-		s.Equal(s.bucketName, bucket)
+		s.Equal(s.bucket, bucket)
 		s.Equal("test", file)
 		called = true
 		return nil
 	}
 
-	processor := NewRemoteFileProcessor(s.listFunc, removeFunc, s.putFunc)
-	err := processor.Remove(s.bucketName, "test")
+	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, removeFunc, s.putFunc)
+	err := processor.Remove("test")
 
 	s.Require().NoError(err)
 	s.True(called)
@@ -156,8 +162,8 @@ func (s *RemoteProcessorTestSuite) Test_Remove_Error() {
 		return expectedErr
 	}
 
-	processor := NewRemoteFileProcessor(s.listFunc, removeFunc, s.putFunc)
-	err := processor.Remove(s.bucketName, "test")
+	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, removeFunc, s.putFunc)
+	err := processor.Remove("test")
 
 	s.Error(err)
 	s.True(called)
@@ -169,7 +175,7 @@ func (s *RemoteProcessorTestSuite) Test_Put_Happy() {
 	expectedFile := "/tmp/test"
 
 	putFunc := func(bucket, fileName, filePath, contentType string) (int64, error) {
-		s.Equal(s.bucketName, bucket)
+		s.Equal(s.bucket, bucket)
 		s.Equal(expectedFile, fileName)
 		s.Equal(expectedFile, filePath)
 		s.Equal("", contentType)
@@ -178,9 +184,9 @@ func (s *RemoteProcessorTestSuite) Test_Put_Happy() {
 		return 0, nil
 	}
 
-	processor := NewRemoteFileProcessor(s.listFunc, s.removeFunc, putFunc)
+	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)
 
-	err := processor.Put(s.bucketName, expectedFile)
+	err := processor.Put(expectedFile)
 
 	s.Require().NoError(err)
 	s.True(called)
@@ -196,9 +202,9 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorOnFailure() {
 		return 0, expectedErr
 	}
 
-	processor := NewRemoteFileProcessor(s.listFunc, s.removeFunc, putFunc)
+	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)
 
-	err := processor.Put(s.bucketName, expectedFile)
+	err := processor.Put(expectedFile)
 
 	s.Error(err)
 	s.True(called)
@@ -215,9 +221,9 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorIfFileIsMissing() {
 		return 0, nil
 	}
 
-	processor := NewRemoteFileProcessor(s.listFunc, s.removeFunc, putFunc)
+	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)
 
-	err := processor.Put(s.bucketName, expectedFile)
+	err := processor.Put(expectedFile)
 
 	s.Error(err)
 	s.False(called)
