@@ -1,23 +1,34 @@
 package backup
 
-// Make a constructor that accepts methods to call
-// This way we can test this glue package
-// Then in main we pass in real things
+import (
+	"fmt"
+)
 
 type processor struct {
-	gatherLocalFiles  func(string) (map[string]file, error)
-	gatherRemoteFiles func(string) (map[string]file, error)
-	// etc
+	gatherLocalFiles  func() (map[string]file, error)
+	gatherRemoteFiles func() (map[string]file, error)
 }
 
-func NewProcessor(localGather, remoteGather func(string) (map[string]file, error)) processor {
+func NewProcessor(localGather, remoteGather func() (map[string]file, error)) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
 		gatherRemoteFiles: remoteGather,
 	}
 }
 
-func (p processor) Process(targetLocal, targetRemote string) error {
-	_, err := p.gatherLocalFiles(targetLocal)
-	return err
+func (p processor) Process() (err error) {
+	localData, err := p.gatherLocalFiles()
+	if err != nil {
+		return
+	}
+
+	remoteData, err := p.gatherRemoteFiles()
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("local: %#v\n", localData)
+	fmt.Printf("remote: %#v\n", remoteData)
+
+	return
 }

@@ -20,7 +20,8 @@ type ProcessorTestSuite struct {
 
 	localGatherCalled, remoteGatherCalled bool
 
-	localGather, remoteGather func(string) (map[string]file, error)
+	localGather, remoteGather func() (map[string]file, error)
+	localData, remoteData     map[string]file
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
@@ -30,40 +31,57 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.localGatherCalled = false
 	s.remoteGatherCalled = false
 
-	s.localGather = func(input string) (map[string]file, error) {
-		s.Equal(s.targetLocal, input)
+	s.localData = make(map[string]file)
+	s.localData["local1"] = newFile("local1", 100)
+
+	s.remoteData = make(map[string]file)
+	s.remoteData["remote1"] = newFile("remote1", 100)
+
+	s.localGather = func() (map[string]file, error) {
 		s.localGatherCalled = true
-		return nil, nil
+		return s.localData, nil
 	}
 
-	s.remoteGather = func(input string) (map[string]file, error) {
-		s.Equal(s.targetRemote, input)
+	s.remoteGather = func() (map[string]file, error) {
 		s.remoteGatherCalled = true
-		return nil, nil
+		return s.remoteData, nil
 	}
 
 	s.processor = NewProcessor(s.localGather, s.remoteGather)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
-	s.processor.Process(s.targetLocal, s.targetRemote)
+	s.processor.Process()
 	s.True(s.localGatherCalled)
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	expectedErr := errors.New("asplode!")
-	localErrFunc := func(input string) (map[string]file, error) {
+	localErrFunc := func() (map[string]file, error) {
 		s.localGatherCalled = true
 		return nil, expectedErr
 	}
 
-	err := NewProcessor(localErrFunc, s.remoteGather).Process(s.targetLocal, s.targetRemote)
+	err := NewProcessor(localErrFunc, s.remoteGather).Process()
 
 	s.Require().True(s.localGatherCalled)
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
 }
 
-//TODO Must call remote and test remote error
-//TODO Then test that the right data comes back from both and let's print it.
-//TODO then let's test the command line, compare remote contents and local contents
+func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
+	s.processor.Process()
+	s.True(s.remoteGatherCalled)
+}
+
+func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
+	expectedErr := errors.New("asplode!")
+	remoteErrFunc := func() (map[string]file, error) {
+		return nil, expectedErr
+	}
+
+	err := NewProcessor(s.localGather, remoteErrFunc).Process()
+
+	s.Require().Error(err)
+	s.Equal(expectedErr, err)
+}
