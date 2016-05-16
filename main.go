@@ -6,7 +6,7 @@ import (
 
 	"github.com/minio/minio-go"
 
-	backup "github.com/ptrimble/dreamhost-personal-backup"
+	"github.com/ptrimble/dreamhost-personal-backup/backup"
 )
 
 func main() {

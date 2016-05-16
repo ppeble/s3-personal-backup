@@ -1,7 +1,7 @@
 default: test
 
 test:
-	go test -cover ./
+	go test -cover ./backup
 
 vet:
 	@go vet ./...
@@ -11,7 +11,7 @@ run: build
 	./dreamhost-personal-backup
 
 build: clean
-	go build -o build/dreamhost-personal-backup ./bin
+	go build -o build/dreamhost-personal-backup ./
 
 clean:
 	rm -rf build
