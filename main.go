@@ -48,9 +48,14 @@ func main() {
 	processor := backup.NewProcessor(
 		localFileProcessor.Gather,
 		remoteFileProcessor.Gather,
+		remoteFileProcessor.Put,
+		remoteFileProcessor.Remove,
 	)
 
-	processor.Process()
+	err = processor.Process()
+	if err != nil {
+		panic(err)
+	}
 
 	// a processor should do this
 	// Get all local info. - DONE

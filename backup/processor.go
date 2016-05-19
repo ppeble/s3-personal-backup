@@ -7,28 +7,54 @@ import (
 type processor struct {
 	gatherLocalFiles  func() (map[string]file, error)
 	gatherRemoteFiles func() (map[string]file, error)
+	putToRemote       func(string) error
+	removeFromRemote  func(string) error
 }
 
-func NewProcessor(localGather, remoteGather func() (map[string]file, error)) processor {
+func NewProcessor(
+	localGather, remoteGather func() (map[string]file, error),
+	putToRemote, removeFromRemote func(string) error,
+) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
 		gatherRemoteFiles: remoteGather,
+		putToRemote:       putToRemote,
+		removeFromRemote:  removeFromRemote,
 	}
 }
 
 func (p processor) Process() (err error) {
-	localData, err := p.gatherLocalFiles()
+	localFiles, err := p.gatherLocalFiles()
 	if err != nil {
 		return
 	}
 
-	remoteData, err := p.gatherRemoteFiles()
+	remoteFiles, err := p.gatherRemoteFiles()
 	if err != nil {
 		return
 	}
 
-	fmt.Printf("local: %#v\n", localData)
-	fmt.Printf("remote: %#v\n", remoteData)
+	fmt.Printf("test")
+	p.processLocalVsRemote(localFiles, remoteFiles)
+	p.processRemoteVsLocal(localFiles, remoteFiles)
 
 	return
+}
+
+func (p processor) processLocalVsRemote(local, remote map[string]file) {
+	for lkey, lfile := range local {
+		rfile, found := remote[lkey]
+		if !found || !isEqual(lfile, rfile) {
+			p.putToRemote(lkey)
+		}
+	}
+}
+
+func (p processor) processRemoteVsLocal(local, remote map[string]file) {
+	for rkey, _ := range remote {
+		_, found := local[rkey]
+		if !found {
+			p.removeFromRemote(rkey)
+		}
+	}
 }

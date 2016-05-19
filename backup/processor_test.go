@@ -14,22 +14,19 @@ func TestProcessorTestSuite(t *testing.T) {
 type ProcessorTestSuite struct {
 	suite.Suite
 
-	targetLocal, targetRemote string
+	localGatherCalled, remoteGatherCalled     bool
+	putToRemoteCalled, removeFromRemoteCalled bool
 
-	processor processor
-
-	localGatherCalled, remoteGatherCalled bool
-
-	localGather, remoteGather func() (map[string]file, error)
-	localData, remoteData     map[string]file
+	localGather, remoteGather     func() (map[string]file, error)
+	putToRemote, removeFromRemote func(string) error
+	localData, remoteData         map[string]file
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
-	s.targetLocal = "/tmp"
-	s.targetRemote = "test"
-
 	s.localGatherCalled = false
 	s.remoteGatherCalled = false
+	s.putToRemoteCalled = false
+	s.removeFromRemoteCalled = false
 
 	s.localData = make(map[string]file)
 	s.localData["local1"] = newFile("local1", 100)
@@ -47,22 +44,34 @@ func (s *ProcessorTestSuite) SetupTest() {
 		return s.remoteData, nil
 	}
 
-	s.processor = NewProcessor(s.localGather, s.remoteGather)
+	s.putToRemote = func(f string) error {
+		s.putToRemoteCalled = true
+		return nil
+	}
+
+	s.removeFromRemote = func(f string) error {
+		s.removeFromRemoteCalled = true
+		return nil
+	}
+}
+
+func (s ProcessorTestSuite) processor() processor {
+	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
-	s.processor.Process()
+	s.processor().Process()
 	s.True(s.localGatherCalled)
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	expectedErr := errors.New("asplode!")
-	localErrFunc := func() (map[string]file, error) {
+	s.localGather = func() (map[string]file, error) {
 		s.localGatherCalled = true
 		return nil, expectedErr
 	}
 
-	err := NewProcessor(localErrFunc, s.remoteGather).Process()
+	err := s.processor().Process()
 
 	s.Require().True(s.localGatherCalled)
 	s.Require().Error(err)
@@ -70,18 +79,86 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
-	s.processor.Process()
+	s.processor().Process()
 	s.True(s.remoteGatherCalled)
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 	expectedErr := errors.New("asplode!")
-	remoteErrFunc := func() (map[string]file, error) {
+	s.remoteGather = func() (map[string]file, error) {
 		return nil, expectedErr
 	}
 
-	err := NewProcessor(s.localGather, remoteErrFunc).Process()
+	err := s.processor().Process()
 
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
+}
+
+func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
+	local := map[string]file{"file": newFile("file", 100)}
+	remote := map[string]file{"file": newFile("file", 100)}
+
+	s.processor().processLocalVsRemote(local, remote)
+
+	s.False(s.putToRemoteCalled)
+	s.False(s.removeFromRemoteCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
+	local := map[string]file{"file": newFile("file", 100)}
+	remote := map[string]file{"file": newFile("file", 101)}
+
+	s.putToRemote = func(f string) error {
+		s.putToRemoteCalled = true
+		s.Equal("file", f)
+		return nil
+	}
+
+	s.processor().processLocalVsRemote(local, remote)
+
+	s.True(s.putToRemoteCalled)
+	s.False(s.removeFromRemoteCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
+	local := map[string]file{"file": newFile("file", 100)}
+	remote := map[string]file{}
+
+	s.putToRemote = func(f string) error {
+		s.putToRemoteCalled = true
+		s.Equal("file", f)
+		return nil
+	}
+
+	s.processor().processLocalVsRemote(local, remote)
+
+	s.True(s.putToRemoteCalled)
+	s.False(s.removeFromRemoteCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
+	local := map[string]file{"file": newFile("file", 100)}
+	remote := map[string]file{"file": newFile("file", 100)}
+
+	s.processor().processRemoteVsLocal(local, remote)
+
+	s.False(s.putToRemoteCalled)
+	s.False(s.removeFromRemoteCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
+	local := map[string]file{}
+	remote := map[string]file{"file": newFile("file", 100)}
+
+	s.removeFromRemote = func(f string) error {
+		s.removeFromRemoteCalled = true
+		s.Equal("file", f)
+		return nil
+	}
+
+	s.processor().processRemoteVsLocal(local, remote)
+
+	s.False(s.putToRemoteCalled)
+	s.True(s.removeFromRemoteCalled)
 }
