@@ -20,7 +20,7 @@ type LocalProcessorTestSuite struct {
 
 func (s *LocalProcessorTestSuite) SetupTest() {
 	s.rootDir = s.createTempDir("", "rootDir")
-	s.processor = NewLocalFileProcessor()
+	s.processor = NewLocalFileProcessor(s.rootDir)
 }
 
 func (s *LocalProcessorTestSuite) TeardownTest() {
@@ -28,7 +28,8 @@ func (s *LocalProcessorTestSuite) TeardownTest() {
 }
 
 func (s *LocalProcessorTestSuite) Test_Process_Error() {
-	_, err := s.processor.Gather("bad_file_path")
+	processor := NewLocalFileProcessor("bad_file_path")
+	_, err := processor.Gather()
 
 	s.Require().Error(err)
 }
@@ -36,7 +37,7 @@ func (s *LocalProcessorTestSuite) Test_Process_Error() {
 func (s *LocalProcessorTestSuite) Test_Process_SingleDirSingleFile() {
 	tempFile := s.createTempFile(s.rootDir, "TEST")
 
-	localFileInfo, err := s.processor.Gather(s.rootDir)
+	localFileInfo, err := s.processor.Gather()
 	s.Require().NoError(err)
 
 	s.compare(tempFile, localFileInfo)
@@ -47,7 +48,7 @@ func (s *LocalProcessorTestSuite) Test_Process_SingleDirMultipleFiles() {
 	tempFile2 := s.createTempFile(s.rootDir, "TEST2")
 	tempFile3 := s.createTempFile(s.rootDir, "TEST3")
 
-	localFileInfo, err := s.processor.Gather(s.rootDir)
+	localFileInfo, err := s.processor.Gather()
 	s.Require().NoError(err)
 
 	s.compare(tempFile1, localFileInfo)
@@ -61,7 +62,7 @@ func (s *LocalProcessorTestSuite) Test_Process_TwoDirsSingleFile() {
 	innerTempDir := s.createTempDir(s.rootDir, "innerDir")
 	innerTempFile := s.createTempFile(innerTempDir, "innerTestFile")
 
-	localFileInfo, err := s.processor.Gather(s.rootDir)
+	localFileInfo, err := s.processor.Gather()
 	s.Require().NoError(err)
 
 	s.compare(rootDirTempFile, localFileInfo)
@@ -78,7 +79,7 @@ func (s *LocalProcessorTestSuite) Test_Process_TwoDirsMultipleFiles() {
 	innerTempFile2 := s.createTempFile(innerTempDir, "innerTestFile2")
 	innerTempFile3 := s.createTempFile(innerTempDir, "innerTestFile3")
 
-	localFileInfo, err := s.processor.Gather(s.rootDir)
+	localFileInfo, err := s.processor.Gather()
 	s.Require().NoError(err)
 
 	s.compare(rootDirTempFile1, localFileInfo)
@@ -124,7 +125,7 @@ func (s *LocalProcessorTestSuite) Test_Process_MultipleDirsMultipleFilesDifferen
 
 	s.createTempDir(nestedTempDir3, "nestedDir5")
 
-	localFileInfo, err := s.processor.Gather(s.rootDir)
+	localFileInfo, err := s.processor.Gather()
 	s.Require().NoError(err)
 
 	s.compare(rootDirTempFile1, localFileInfo)
