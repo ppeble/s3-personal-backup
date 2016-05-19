@@ -162,3 +162,56 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
 }
+
+func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
+	local := map[string]file{
+		"file1": newFile("file1", 100),
+		"file2": newFile("file2", 200),
+		"file3": newFile("file3", 300),
+		"file4": newFile("file4", 400),
+		"file5": newFile("file5", 500),
+	}
+
+	remote := map[string]file{
+		"file1": newFile("file1", 100),
+		"file2": newFile("file2", 201),
+		"file3": newFile("file3", 300),
+		"file4": newFile("file4", 400),
+		"file6": newFile("file6", 600),
+	}
+
+	s.localGather = func() (map[string]file, error) {
+		return local, nil
+	}
+
+	s.remoteGather = func() (map[string]file, error) {
+		return remote, nil
+	}
+
+	putCalledCnt := 0
+	s.putToRemote = func(f string) error {
+		putCalledCnt++
+		if putCalledCnt == 1 {
+			s.Equal("file2", f)
+		} else if putCalledCnt == 2 {
+			s.Equal("file5", f)
+		}
+
+		return nil
+	}
+
+	removeCalledCnt := 0
+	s.removeFromRemote = func(f string) error {
+		removeCalledCnt++
+		if removeCalledCnt == 1 {
+			s.Equal("file6", f)
+		}
+
+		return nil
+	}
+
+	s.processor().Process()
+
+	s.Equal(2, putCalledCnt)
+	s.Equal(1, removeCalledCnt)
+}

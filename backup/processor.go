@@ -1,9 +1,5 @@
 package backup
 
-import (
-	"fmt"
-)
-
 type processor struct {
 	gatherLocalFiles  func() (map[string]file, error)
 	gatherRemoteFiles func() (map[string]file, error)
@@ -34,7 +30,6 @@ func (p processor) Process() (err error) {
 		return
 	}
 
-	fmt.Printf("test")
 	p.processLocalVsRemote(localFiles, remoteFiles)
 	p.processRemoteVsLocal(localFiles, remoteFiles)
 
