@@ -1,7 +1,8 @@
 default: test
 
 test:
-	go test -cover ./backup
+	go test -tags test -coverprofile ./backup/test.cov ./backup
+	go tool cover -func "./backup/test.cov" | awk '$$3 !~ /^100/ { print; gaps++} END { exit gaps }'
 
 vet:
 	go vet ./...
