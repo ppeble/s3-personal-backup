@@ -9,33 +9,22 @@ import (
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
 )
 
+var targetDir string
+
+var s3Host, s3AccessKey, s3SecretKey, s3BucketName string
+
 func main() {
-	var targetDirViaFlag, targetDirViaEnv string
-	flag.StringVar(&targetDirViaFlag, "targetDir", "", "Local directory to back up. Required.")
-	flag.Parse()
+	processVars()
 
-	targetDirViaEnv = os.Getenv("PERSONAL_BACKUP_TARGET_DIR")
-
-	var targetDir string
-	if targetDirViaFlag != "" {
-		targetDir = targetDirViaFlag
-	} else if targetDirViaEnv != "" {
-		targetDir = targetDirViaEnv
-	} else {
-		panic("target dir must be specified via either command line (-targetDir) or env var (PERSONAL_BACKUP_TARGET_DIR)")
-	}
-
-	//TODO Set up these values are args
-	s3Client, err := minio.NewV2("objects-us-west-1.dream.io", "hXQheR4_EeBgkX7GgINx", "4kXhKcPmIRSXAXR_DSJwhCFQkc2X49N6q5SHvkGv", false)
+	s3Client, err := minio.NewV2(s3Host, s3AccessKey, s3SecretKey, false)
 	if err != nil {
 		panic(err)
 	}
 
 	localFileProcessor := backup.NewLocalFileProcessor(targetDir)
 
-	//TODO The bucket needs to be A) an arg or B) picked at random (uuid?)
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
-		"test11112",
+		s3BucketName,
 		s3Client.ListObjects,
 		s3Client.RemoveObject,
 		s3Client.FPutObject,
@@ -58,4 +47,66 @@ func main() {
 	}
 
 	// Keep track of what changed to give a report at the end - last big component
+}
+
+var targetDirViaFlag, targetDirViaEnv string
+var s3HostViaFlag, s3HostViaEnv string
+var s3AccessKeyViaFlag, s3AccessKeyViaEnv string
+var s3SecretKeyViaFlag, s3SecretKeyViaEnv string
+var s3BucketNameViaFlag, s3BucketNameViaEnv string
+
+//FIXME This is probably a MUCH better way to do this.
+func processVars() {
+	flag.StringVar(&targetDirViaFlag, "targetDir", "", "Local directory to back up. Required.")
+	flag.StringVar(&s3HostViaFlag, "s3Host", "", "S3 host. Required.")
+	flag.StringVar(&s3AccessKeyViaFlag, "s3AccessKey", "", "S3 access key. Required.")
+	flag.StringVar(&s3SecretKeyViaFlag, "s3SecretKey", "", "S3 secret key. Required.")
+	flag.StringVar(&s3BucketNameViaFlag, "s3BucketName", "", "S3 Bucket Name. Optional.")
+	flag.Parse()
+
+	targetDirViaEnv = os.Getenv("PERSONAL_BACKUP_TARGET_DIR")
+	s3HostViaEnv = os.Getenv("PERSONAL_BACKUP_S3_HOST")
+	s3AccessKeyViaEnv = os.Getenv("PERSONAL_BACKUP_S3_ACCESS_KEY")
+	s3SecretKeyViaFlag = os.Getenv("PERSONAL_BACKUP_S3_SECRET_KEY")
+	s3BucketNameViaEnv = os.Getenv("PERSONAL_BACKUP_S3_BUCKET_NAME")
+
+	if targetDirViaFlag != "" {
+		targetDir = targetDirViaFlag
+	} else if targetDirViaEnv != "" {
+		targetDir = targetDirViaEnv
+	} else {
+		panic("target dir must be specified via either command line (-targetDir) or env var (PERSONAL_BACKUP_TARGET_DIR)")
+	}
+
+	if s3HostViaFlag != "" {
+		s3Host = s3HostViaFlag
+	} else if s3HostViaEnv != "" {
+		s3Host = s3HostViaEnv
+	} else {
+		panic("s3 host must be specified via either command line (-s3Host) or env var (PERSONAL_BACKUP_S3_HOST)")
+	}
+
+	if s3AccessKeyViaFlag != "" {
+		s3AccessKey = s3AccessKeyViaFlag
+	} else if s3AccessKeyViaEnv != "" {
+		s3AccessKey = s3AccessKeyViaEnv
+	} else {
+		panic("s3 access key must be specified via either command line (-s3AccessKey) or env var (PERSONAL_BACKUP_S3_ACCESS_KEY)")
+	}
+
+	if s3SecretKeyViaFlag != "" {
+		s3SecretKey = s3SecretKeyViaFlag
+	} else if s3SecretKeyViaEnv != "" {
+		s3SecretKey = s3SecretKeyViaEnv
+	} else {
+		panic("s3 secret key must be specified via either command line (-s3SecretKey) or env var (PERSONAL_BACKUP_S3_SECRET_KEY)")
+	}
+
+	if s3BucketNameViaFlag != "" {
+		s3BucketName = s3BucketNameViaFlag
+	} else if s3BucketNameViaEnv != "" {
+		s3BucketName = s3BucketNameViaEnv
+	} else {
+		panic("s3 bucket name must be specified via either command line (-s3BucketName) or env var (PERSONAL_BACKUP_S3_BUCKET_NAME)")
+	}
 }
