@@ -57,12 +57,5 @@ func main() {
 		panic(err)
 	}
 
-	// a processor should do this
-	// Get all local info. - DONE
-	// Get all remote info - DONE
-	//Go through EVERY file and compare it against the remote. This can be a comparer that decides what to do
-	// a) If diff found (or not found) then add it to the 'diff' list
-	// b) if no diff then move on
-	// c) At the end, send everything in the 'diff' list
-	// Keep track of what changed to give a report at the end
+	// Keep track of what changed to give a report at the end - last big component
 }

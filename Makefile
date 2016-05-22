@@ -4,7 +4,7 @@ test:
 	go test -cover ./backup
 
 vet:
-	@go vet ./...
+	go vet ./...
 
 run: build
 	cp build/dreamhost-personal-backup dreamhost-personal-backup
