@@ -1,5 +1,14 @@
 package backup
 
+import (
+	"sync"
+)
+
+type gatherResult struct {
+	result map[string]file
+	err    error
+}
+
 type processor struct {
 	gatherLocalFiles  func() (map[string]file, error)
 	gatherRemoteFiles func() (map[string]file, error)
@@ -20,23 +29,46 @@ func NewProcessor(
 }
 
 func (p processor) Process() (err error) {
-	localFiles, err := p.gatherLocalFiles()
-	if err != nil {
-		return
+	localResultChan := make(chan gatherResult)
+	remoteResultChan := make(chan gatherResult)
+
+	go func(out chan<- gatherResult) {
+		files, err := p.gatherLocalFiles()
+		out <- gatherResult{result: files, err: err}
+	}(localResultChan)
+
+	go func(out chan<- gatherResult) {
+		files, err := p.gatherRemoteFiles()
+		out <- gatherResult{result: files, err: err}
+	}(remoteResultChan)
+
+	local := <-localResultChan
+	if local.err != nil {
+		return local.err
 	}
 
-	remoteFiles, err := p.gatherRemoteFiles()
-	if err != nil {
-		return
+	remote := <-remoteResultChan
+	if remote.err != nil {
+		return remote.err
 	}
 
-	p.processLocalVsRemote(localFiles, remoteFiles)
-	p.processRemoteVsLocal(localFiles, remoteFiles)
+	defer close(localResultChan)
+	defer close(remoteResultChan)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go p.processLocalVsRemote(local.result, remote.result, &wg)
+	go p.processRemoteVsLocal(local.result, remote.result, &wg)
+
+	wg.Wait()
 
 	return
 }
 
-func (p processor) processLocalVsRemote(local, remote map[string]file) {
+func (p processor) processLocalVsRemote(local, remote map[string]file, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
 		if !found || !isEqual(lfile, rfile) {
@@ -45,7 +77,9 @@ func (p processor) processLocalVsRemote(local, remote map[string]file) {
 	}
 }
 
-func (p processor) processRemoteVsLocal(local, remote map[string]file) {
+func (p processor) processRemoteVsLocal(local, remote map[string]file, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for rkey, _ := range remote {
 		_, found := local[rkey]
 		if !found {

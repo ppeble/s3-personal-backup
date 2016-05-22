@@ -2,6 +2,8 @@ package backup
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -20,6 +22,8 @@ type ProcessorTestSuite struct {
 	localGather, remoteGather     func() (map[string]file, error)
 	putToRemote, removeFromRemote func(string) error
 	localData, remoteData         map[string]file
+
+	waitGroup *sync.WaitGroup
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
@@ -53,6 +57,8 @@ func (s *ProcessorTestSuite) SetupTest() {
 		s.removeFromRemoteCalled = true
 		return nil
 	}
+
+	s.waitGroup = &sync.WaitGroup{}
 }
 
 func (s ProcessorTestSuite) processor() processor {
@@ -99,7 +105,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	s.processor().processLocalVsRemote(local, remote)
+	s.waitGroup.Add(1)
+	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -115,7 +122,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 		return nil
 	}
 
-	s.processor().processLocalVsRemote(local, remote)
+	s.waitGroup.Add(1)
+	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -131,7 +139,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 		return nil
 	}
 
-	s.processor().processLocalVsRemote(local, remote)
+	s.waitGroup.Add(1)
+	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -141,7 +150,8 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	s.processor().processRemoteVsLocal(local, remote)
+	s.waitGroup.Add(1)
+	s.processor().processRemoteVsLocal(local, remote, s.waitGroup)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -157,7 +167,8 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 		return nil
 	}
 
-	s.processor().processRemoteVsLocal(local, remote)
+	s.waitGroup.Add(1)
+	s.processor().processRemoteVsLocal(local, remote, s.waitGroup)
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
@@ -191,12 +202,9 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
 	putCalledCnt := 0
 	s.putToRemote = func(f string) error {
 		putCalledCnt++
-		if putCalledCnt == 1 {
-			s.Equal("file2", f)
-		} else if putCalledCnt == 2 {
-			s.Equal("file5", f)
+		if f != "file2" && f != "file5" {
+			s.Assert().Fail(fmt.Sprintf("Expected either 'file2' or 'file5' as put operation, received: '%s'", f))
 		}
-
 		return nil
 	}
 
