@@ -23,7 +23,7 @@ type ProcessorTestSuite struct {
 	putToRemote, removeFromRemote func(string) error
 	localData, remoteData         map[string]file
 
-	waitGroup *sync.WaitGroup
+	logChan chan logEntry
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
@@ -58,11 +58,11 @@ func (s *ProcessorTestSuite) SetupTest() {
 		return nil
 	}
 
-	s.waitGroup = &sync.WaitGroup{}
+	s.logChan = make(chan logEntry)
 }
 
 func (s ProcessorTestSuite) processor() processor {
-	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote)
+	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote, s.logChan)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
@@ -77,11 +77,27 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 		return nil, expectedErr
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	var entry logEntry
+	go func() {
+		entry = <-s.logChan
+		wg.Done()
+	}()
+
 	err := s.processor().Process()
+
+	wg.Wait()
 
 	s.Require().True(s.localGatherCalled)
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
+
+	s.Equal(
+		logEntry{message: "error returned while gathering local files, err: asplode!"},
+		entry,
+	)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
@@ -92,21 +108,40 @@ func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 	expectedErr := errors.New("asplode!")
 	s.remoteGather = func() (map[string]file, error) {
+		s.remoteGatherCalled = true
 		return nil, expectedErr
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	var entry logEntry
+	go func() {
+		entry = <-s.logChan
+		wg.Done()
+	}()
+
 	err := s.processor().Process()
 
+	wg.Wait()
+
 	s.Require().Error(err)
+	s.True(s.remoteGatherCalled)
 	s.Equal(expectedErr, err)
+
+	s.Equal(
+		logEntry{message: "error returned while gathering remote files, err: asplode!"},
+		entry,
+	)
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	s.waitGroup.Add(1)
-	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote, &wg)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -122,8 +157,9 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 		return nil
 	}
 
-	s.waitGroup.Add(1)
-	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote, &wg)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -139,8 +175,9 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 		return nil
 	}
 
-	s.waitGroup.Add(1)
-	s.processor().processLocalVsRemote(local, remote, s.waitGroup)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote, &wg)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -150,8 +187,9 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	s.waitGroup.Add(1)
-	s.processor().processRemoteVsLocal(local, remote, s.waitGroup)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote, &wg)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -167,8 +205,9 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 		return nil
 	}
 
-	s.waitGroup.Add(1)
-	s.processor().processRemoteVsLocal(local, remote, s.waitGroup)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote, &wg)
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)

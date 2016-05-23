@@ -55,7 +55,7 @@ var s3AccessKeyViaFlag, s3AccessKeyViaEnv string
 var s3SecretKeyViaFlag, s3SecretKeyViaEnv string
 var s3BucketNameViaFlag, s3BucketNameViaEnv string
 
-//FIXME This is probably a MUCH better way to do this.
+//FIXME There is probably a MUCH better way to do this.
 func processVars() {
 	flag.StringVar(&targetDirViaFlag, "targetDir", "", "Local directory to back up. Required.")
 	flag.StringVar(&s3HostViaFlag, "s3Host", "", "S3 host. Required.")

@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -14,17 +15,20 @@ type processor struct {
 	gatherRemoteFiles func() (map[string]file, error)
 	putToRemote       func(string) error
 	removeFromRemote  func(string) error
+	log               chan<- logEntry
 }
 
 func NewProcessor(
 	localGather, remoteGather func() (map[string]file, error),
 	putToRemote, removeFromRemote func(string) error,
+	log chan<- logEntry,
 ) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
 		gatherRemoteFiles: remoteGather,
 		putToRemote:       putToRemote,
 		removeFromRemote:  removeFromRemote,
+		log:               log,
 	}
 }
 
@@ -44,11 +48,19 @@ func (p processor) Process() (err error) {
 
 	local := <-localResultChan
 	if local.err != nil {
+		p.log <- logEntry{
+			message: fmt.Sprintf("error returned while gathering local files, err: %s", local.err),
+		}
+
 		return local.err
 	}
 
 	remote := <-remoteResultChan
 	if remote.err != nil {
+		p.log <- logEntry{
+			message: fmt.Sprintf("error returned while gathering remote files, err: %s", remote.err),
+		}
+
 		return remote.err
 	}
 
