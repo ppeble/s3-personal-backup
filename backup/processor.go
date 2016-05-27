@@ -15,20 +15,20 @@ type processor struct {
 	gatherRemoteFiles func() (map[string]file, error)
 	putToRemote       func(string) error
 	removeFromRemote  func(string) error
-	log               chan<- logEntry
+	logger            BackupLogger
 }
 
 func NewProcessor(
 	localGather, remoteGather func() (map[string]file, error),
 	putToRemote, removeFromRemote func(string) error,
-	log chan<- logEntry,
+	log BackupLogger,
 ) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
 		gatherRemoteFiles: remoteGather,
 		putToRemote:       putToRemote,
 		removeFromRemote:  removeFromRemote,
-		log:               log,
+		logger:            log,
 	}
 }
 
@@ -48,18 +48,18 @@ func (p processor) Process() (err error) {
 
 	local := <-localResultChan
 	if local.err != nil {
-		p.log <- logEntry{
+		p.logger.Error(LogEntry{
 			message: fmt.Sprintf("error returned while gathering local files, err: %s", local.err),
-		}
+		})
 
 		return local.err
 	}
 
 	remote := <-remoteResultChan
 	if remote.err != nil {
-		p.log <- logEntry{
+		p.logger.Error(LogEntry{
 			message: fmt.Sprintf("error returned while gathering remote files, err: %s", remote.err),
-		}
+		})
 
 		return remote.err
 	}
@@ -83,8 +83,34 @@ func (p processor) processLocalVsRemote(local, remote map[string]file, wg *sync.
 
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
-		if !found || !isEqual(lfile, rfile) {
-			p.putToRemote(lkey)
+
+		var entry LogEntry
+		push := false
+
+		if !found {
+			push = true
+			entry = LogEntry{
+				message: fmt.Sprintf("not found, pushing to remote NEW - %s", lfile),
+				file:    lkey,
+			}
+		} else if !isEqual(lfile, rfile) {
+			push = true
+			entry = LogEntry{
+				message: fmt.Sprintf("mismatch, pushing to remote OLD - %s | NEW - %s", rfile, lfile),
+				file:    lkey,
+			}
+		}
+
+		if push == true {
+			err := p.putToRemote(lkey)
+			if err != nil {
+				p.logger.Error(LogEntry{
+					message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", lfile, err.Error()),
+					file:    lkey,
+				})
+			} else {
+				p.logger.Info(entry)
+			}
 		}
 	}
 }
@@ -92,10 +118,23 @@ func (p processor) processLocalVsRemote(local, remote map[string]file, wg *sync.
 func (p processor) processRemoteVsLocal(local, remote map[string]file, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for rkey, _ := range remote {
+	for rkey, rfile := range remote {
 		_, found := local[rkey]
 		if !found {
-			p.removeFromRemote(rkey)
+			err := p.removeFromRemote(rkey)
+			if err != nil {
+				entry := LogEntry{
+					message: fmt.Sprintf("'%s' not found locally but unable to remove from remote, error: '%s'", rfile, err.Error()),
+					file:    rkey,
+				}
+				p.logger.Error(entry)
+			} else {
+				entry := LogEntry{
+					message: fmt.Sprintf("'%s' not found locally, removing from remote", rfile),
+					file:    rkey,
+				}
+				p.logger.Info(entry)
+			}
 		}
 	}
 }

@@ -75,3 +75,12 @@ func Test_File_newFile(t *testing.T) {
 
 	assert.Equal(t, expected, newFile(tmpFile.Name(), tempFileInfo.Size()))
 }
+
+func Test_File_String(t *testing.T) {
+	f1 := file{
+		name: "file1",
+		size: 100,
+	}
+
+	assert.Equal(t, "name: 'file1' - size: '100'", f1.String())
+}

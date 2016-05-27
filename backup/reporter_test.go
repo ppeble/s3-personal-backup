@@ -2,20 +2,11 @@ package backup
 
 import (
 	"log"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
-
-type sliceLogger struct {
-	messages []string
-}
-
-func (l *sliceLogger) Write(b []byte) (n int, err error) {
-	msg := string(b[:])
-	l.messages = append(l.messages, msg)
-	return len(msg), nil
-}
 
 func TestReporterTestSuite(t *testing.T) {
 	suite.Run(t, new(ReporterTestSuite))
@@ -26,7 +17,7 @@ type ReporterTestSuite struct {
 
 	sliceLogger *sliceLogger
 
-	in     chan logEntry
+	in     chan LogEntry
 	done   chan struct{}
 	logger *log.Logger
 
@@ -38,7 +29,7 @@ func (s *ReporterTestSuite) SetupTest() {
 		messages: make([]string, 0),
 	}
 
-	s.in = make(chan logEntry)
+	s.in = make(chan LogEntry)
 	s.done = make(chan struct{})
 	s.logger = log.New(s.sliceLogger, "INFO: ", log.Ldate|log.Ltime|log.LUTC)
 	s.reporter = NewReporter(s.in, s.done, s.logger)
@@ -56,17 +47,24 @@ func (s *ReporterTestSuite) Test_Constructor() {
 }
 
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
-	go s.reporter.Run()
-	s.in <- logEntry{message: "test", file: "file1"}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go s.reporter.Run(&wg)
+	s.in <- LogEntry{message: "test", file: "file1"}
+	s.done <- struct{}{}
 
+	wg.Wait()
 	s.Contains(s.sliceLogger.messages[0], "INFO: ")
 	s.Contains(s.sliceLogger.messages[0], "file: 'file1' - message: 'test'")
 }
 
 func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
-	go s.reporter.Run()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go s.reporter.Run(&wg)
 	s.done <- struct{}{}
 
+	wg.Wait()
 	s.Contains(s.sliceLogger.messages[0], "INFO: ")
 	s.Contains(s.sliceLogger.messages[0], "Received done signal, stopping reporting process")
 }

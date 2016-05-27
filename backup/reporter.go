@@ -2,9 +2,10 @@ package backup
 
 import (
 	"log"
+	"sync"
 )
 
-func NewReporter(in <-chan logEntry, done <-chan struct{}, l *log.Logger) reporter {
+func NewReporter(in <-chan LogEntry, done <-chan struct{}, l *log.Logger) reporter {
 	return reporter{
 		in:     in,
 		done:   done,
@@ -12,17 +13,15 @@ func NewReporter(in <-chan logEntry, done <-chan struct{}, l *log.Logger) report
 	}
 }
 
-type logEntry struct {
-	message, file string
-}
-
 type reporter struct {
-	in     <-chan logEntry
+	in     <-chan LogEntry
 	done   <-chan struct{}
 	logger *log.Logger
 }
 
-func (r *reporter) Run() {
+func (r *reporter) Run(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for {
 		select {
 		case entry := <-r.in:

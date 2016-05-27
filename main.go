@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
+	"sync"
 
 	"github.com/minio/minio-go"
 
@@ -21,6 +23,17 @@ func main() {
 		panic(err)
 	}
 
+	reportChan := make(chan backup.LogEntry)
+	reportDone := make(chan struct{})
+	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
+	reportGenerator := backup.NewReporter(reportChan, reportDone, reportOut)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go reportGenerator.Run(&wg)
+
+	logger := backup.NewLogger(os.Stdout, reportChan)
+
 	localFileProcessor := backup.NewLocalFileProcessor(targetDir)
 
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
@@ -29,7 +42,6 @@ func main() {
 		s3Client.RemoveObject,
 		s3Client.FPutObject,
 	)
-
 	if err != nil {
 		panic(err)
 	}
@@ -39,6 +51,7 @@ func main() {
 		remoteFileProcessor.Gather,
 		remoteFileProcessor.Put,
 		remoteFileProcessor.Remove,
+		logger,
 	)
 
 	err = processor.Process()
@@ -46,7 +59,9 @@ func main() {
 		panic(err)
 	}
 
-	// Keep track of what changed to give a report at the end - last big component
+	reportDone <- struct{}{}
+	wg.Wait()
+	// reporter is done now, what do we do with that data?
 }
 
 var targetDirViaFlag, targetDirViaEnv string

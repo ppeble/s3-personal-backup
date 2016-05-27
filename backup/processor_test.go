@@ -9,6 +9,19 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+type testLogger struct {
+	logInfo  func(LogEntry)
+	logError func(LogEntry)
+}
+
+func (l testLogger) Info(i LogEntry) {
+	l.logInfo(i)
+}
+
+func (l testLogger) Error(i LogEntry) {
+	l.logError(i)
+}
+
 func TestProcessorTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessorTestSuite))
 }
@@ -23,7 +36,8 @@ type ProcessorTestSuite struct {
 	putToRemote, removeFromRemote func(string) error
 	localData, remoteData         map[string]file
 
-	logChan chan logEntry
+	logInfoCalled, logErrorCalled bool
+	logger                        testLogger
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
@@ -58,11 +72,21 @@ func (s *ProcessorTestSuite) SetupTest() {
 		return nil
 	}
 
-	s.logChan = make(chan logEntry)
+	s.logInfoCalled = false
+	s.logErrorCalled = false
+
+	s.logger = testLogger{
+		logInfo: func(i LogEntry) {
+			s.logInfoCalled = true
+		},
+		logError: func(i LogEntry) {
+			s.logErrorCalled = true
+		},
+	}
 }
 
 func (s ProcessorTestSuite) processor() processor {
-	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote, s.logChan)
+	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote, s.logger)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
@@ -77,27 +101,18 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 		return nil, expectedErr
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	var entry logEntry
-	go func() {
-		entry = <-s.logChan
-		wg.Done()
-	}()
+	s.logger.logError = func(i LogEntry) {
+		s.logErrorCalled = true
+		s.Equal(LogEntry{message: "error returned while gathering local files, err: asplode!"}, i)
+	}
 
 	err := s.processor().Process()
-
-	wg.Wait()
 
 	s.Require().True(s.localGatherCalled)
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
-
-	s.Equal(
-		logEntry{message: "error returned while gathering local files, err: asplode!"},
-		entry,
-	)
+	s.True(s.logErrorCalled)
+	s.False(s.logInfoCalled)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
@@ -112,27 +127,18 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 		return nil, expectedErr
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	var entry logEntry
-	go func() {
-		entry = <-s.logChan
-		wg.Done()
-	}()
+	s.logger.logError = func(i LogEntry) {
+		s.logErrorCalled = true
+		s.Equal(LogEntry{message: "error returned while gathering remote files, err: asplode!"}, i)
+	}
 
 	err := s.processor().Process()
-
-	wg.Wait()
 
 	s.Require().Error(err)
 	s.True(s.remoteGatherCalled)
 	s.Equal(expectedErr, err)
-
-	s.Equal(
-		logEntry{message: "error returned while gathering remote files, err: asplode!"},
-		entry,
-	)
+	s.True(s.logErrorCalled)
+	s.False(s.logInfoCalled)
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
@@ -145,6 +151,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
+	s.False(s.logErrorCalled)
+	s.False(s.logInfoCalled)
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
@@ -157,12 +165,25 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 		return nil
 	}
 
+	s.logger.logInfo = func(i LogEntry) {
+		s.logInfoCalled = true
+		s.Equal(
+			LogEntry{
+				message: fmt.Sprintf("mismatch, pushing to remote OLD - %s | NEW - %s", remote["file"], local["file"]),
+				file:    "file",
+			},
+			i,
+		)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote, &wg)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
+	s.True(s.logInfoCalled)
+	s.False(s.logErrorCalled)
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
@@ -175,12 +196,56 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 		return nil
 	}
 
+	s.logger.logInfo = func(i LogEntry) {
+		s.logInfoCalled = true
+		s.Equal(
+			LogEntry{
+				message: fmt.Sprintf("not found, pushing to remote NEW - %s", local["file"]),
+				file:    "file",
+			},
+			i,
+		)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote, &wg)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
+	s.True(s.logInfoCalled)
+	s.False(s.logErrorCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote_PushError() {
+	local := map[string]file{"file": newFile("file", 100)}
+	remote := map[string]file{}
+
+	expectedErr := errors.New("boom")
+	s.putToRemote = func(f string) error {
+		s.putToRemoteCalled = true
+		return expectedErr
+	}
+
+	s.logger.logError = func(i LogEntry) {
+		s.logErrorCalled = true
+		s.Equal(
+			LogEntry{
+				message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", local["file"], expectedErr.Error()),
+				file:    "file",
+			},
+			i,
+		)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote, &wg)
+
+	s.True(s.putToRemoteCalled)
+	s.False(s.removeFromRemoteCalled)
+	s.False(s.logInfoCalled)
+	s.True(s.logErrorCalled)
 }
 
 func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
@@ -205,12 +270,56 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 		return nil
 	}
 
+	s.logger.logInfo = func(i LogEntry) {
+		s.logInfoCalled = true
+		s.Equal(
+			LogEntry{
+				message: fmt.Sprintf("'%s' not found locally, removing from remote", remote["file"]),
+				file:    "file",
+			},
+			i,
+		)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.processor().processRemoteVsLocal(local, remote, &wg)
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
+	s.True(s.logInfoCalled)
+	s.False(s.logErrorCalled)
+}
+
+func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal_ErrorRemovingFromRemote() {
+	local := map[string]file{}
+	remote := map[string]file{"file": newFile("file", 100)}
+
+	expectedErr := errors.New("AAAAAAAHHHHHHHHH")
+	s.removeFromRemote = func(f string) error {
+		s.removeFromRemoteCalled = true
+		return expectedErr
+	}
+
+	s.logger.logError = func(i LogEntry) {
+		s.logErrorCalled = true
+		s.Equal(
+			LogEntry{
+				message: fmt.Sprintf("'%s' not found locally but unable to remove from remote, error: '%s'", remote["file"], expectedErr.Error()),
+				file:    "file",
+			},
+			i,
+		)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote, &wg)
+
+	s.False(s.putToRemoteCalled)
+	s.True(s.removeFromRemoteCalled)
+	s.False(s.logInfoCalled)
+	s.True(s.logErrorCalled)
 }
 
 func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
