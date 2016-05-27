@@ -31,31 +31,21 @@ func (s *ReporterTestSuite) SetupTest() {
 
 	s.in = make(chan LogEntry)
 	s.done = make(chan struct{})
-	s.logger = log.New(s.sliceLogger, "INFO: ", log.Ldate|log.Ltime|log.LUTC)
+	s.logger = log.New(s.sliceLogger, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	s.reporter = NewReporter(s.in, s.done, s.logger)
-}
-
-func (s *ReporterTestSuite) Test_Constructor() {
-	s.Equal(
-		reporter{
-			in:     s.in,
-			done:   s.done,
-			logger: s.logger,
-		},
-		s.reporter,
-	)
 }
 
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go s.reporter.Run(&wg)
-	s.in <- LogEntry{message: "test", file: "file1"}
+
+	expectedEntry := LogEntry{message: "test", file: "file1"}
+	s.in <- expectedEntry
 	s.done <- struct{}{}
 
 	wg.Wait()
-	s.Contains(s.sliceLogger.messages[0], "INFO: ")
-	s.Contains(s.sliceLogger.messages[0], "file: 'file1' - message: 'test'")
+	s.Equal(s.reporter.entries[0], expectedEntry)
 }
 
 func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
@@ -65,6 +55,27 @@ func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
 	s.done <- struct{}{}
 
 	wg.Wait()
-	s.Contains(s.sliceLogger.messages[0], "INFO: ")
 	s.Contains(s.sliceLogger.messages[0], "Received done signal, stopping reporting process")
+}
+
+func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go s.reporter.Run(&wg)
+
+	s.in <- LogEntry{message: "test1", file: "file1"}
+	s.in <- LogEntry{message: "test2", file: "file2"}
+	s.in <- LogEntry{message: "test3", file: "file3"}
+	s.done <- struct{}{}
+
+	wg.Wait()
+
+	s.reporter.Print()
+
+	s.Contains(s.sliceLogger.messages[1], "Report")
+	s.Contains(s.sliceLogger.messages[2], "-------------------------------")
+	s.Contains(s.sliceLogger.messages[3], "file: 'file1' - message: 'test1'")
+	s.Contains(s.sliceLogger.messages[4], "file: 'file2' - message: 'test2'")
+	s.Contains(s.sliceLogger.messages[5], "file: 'file3' - message: 'test3'")
+	s.Contains(s.sliceLogger.messages[6], "")
 }

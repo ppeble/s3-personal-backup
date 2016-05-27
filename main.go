@@ -61,7 +61,7 @@ func main() {
 
 	reportDone <- struct{}{}
 	wg.Wait()
-	// reporter is done now, what do we do with that data?
+	reportGenerator.Print()
 }
 
 var targetDirViaFlag, targetDirViaEnv string

@@ -29,10 +29,6 @@ type backupLogger struct {
 	report   chan<- LogEntry
 }
 
-type LogEntry struct {
-	message, file, level string
-}
-
 func (l backupLogger) Info(i LogEntry) {
 	l.infoLog.Println("file: '" + i.file + "' - message: '" + i.message + "'")
 	l.sendToReporter(i)
