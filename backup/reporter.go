@@ -2,10 +2,13 @@ package backup
 
 import (
 	"log"
-	"sync"
 )
 
-func NewReporter(in <-chan LogEntry, done <-chan struct{}, l *log.Logger) reporter {
+func NewReporter(
+	in <-chan LogEntry,
+	done <-chan struct{},
+	l *log.Logger,
+) reporter {
 	return reporter{
 		in:      in,
 		done:    done,
@@ -22,15 +25,13 @@ type reporter struct {
 	entries []LogEntry
 }
 
-func (r *reporter) Run(wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (r *reporter) Run() {
 	for {
 		select {
 		case entry := <-r.in:
 			r.entries = append(r.entries, entry)
 		case <-r.done:
-			r.logger.Println("Received done signal, stopping reporting process")
+			r.logger.Println("Received done signal, waiting for all processes to finish")
 			return
 		}
 	}

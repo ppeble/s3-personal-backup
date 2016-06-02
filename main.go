@@ -23,16 +23,15 @@ func main() {
 		panic(err)
 	}
 
+	var workerWg sync.WaitGroup
+
 	reportChan := make(chan backup.LogEntry)
 	reportDone := make(chan struct{})
 	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	reportGenerator := backup.NewReporter(reportChan, reportDone, reportOut)
+	go reportGenerator.Run()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go reportGenerator.Run(&wg)
-
-	logger := backup.NewLogger(os.Stdout, reportChan)
+	logger := backup.NewLogger(os.Stdout, reportChan, &workerWg)
 
 	localFileProcessor := backup.NewLocalFileProcessor(targetDir)
 
@@ -52,6 +51,7 @@ func main() {
 		remoteFileProcessor.Put,
 		remoteFileProcessor.Remove,
 		logger,
+		&workerWg,
 	)
 
 	err = processor.Process()
@@ -59,8 +59,8 @@ func main() {
 		panic(err)
 	}
 
+	workerWg.Wait()
 	reportDone <- struct{}{}
-	wg.Wait()
 	reportGenerator.Print()
 }
 

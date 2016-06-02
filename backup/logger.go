@@ -3,6 +3,7 @@ package backup
 import (
 	"io"
 	"log"
+	"sync"
 )
 
 const (
@@ -15,11 +16,12 @@ type BackupLogger interface {
 	Error(LogEntry)
 }
 
-func NewLogger(out io.Writer, report chan<- LogEntry) BackupLogger {
+func NewLogger(out io.Writer, report chan<- LogEntry, wg *sync.WaitGroup) BackupLogger {
 	return backupLogger{
 		infoLog:  log.New(out, INFO+": ", log.Ldate|log.Ltime|log.LUTC),
 		errorLog: log.New(out, ERROR+": ", log.Ldate|log.Ltime|log.LUTC),
 		report:   report,
+		wg:       wg,
 	}
 }
 
@@ -27,6 +29,7 @@ type backupLogger struct {
 	infoLog  *log.Logger
 	errorLog *log.Logger
 	report   chan<- LogEntry
+	wg       *sync.WaitGroup
 }
 
 func (l backupLogger) Info(i LogEntry) {
@@ -40,7 +43,9 @@ func (l backupLogger) Error(i LogEntry) {
 }
 
 func (l backupLogger) sendToReporter(i LogEntry) {
+	l.wg.Add(1)
 	go func() {
 		l.report <- i
+		l.wg.Done()
 	}()
 }

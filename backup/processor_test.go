@@ -38,6 +38,8 @@ type ProcessorTestSuite struct {
 
 	logInfoCalled, logErrorCalled bool
 	logger                        testLogger
+
+	wg *sync.WaitGroup
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
@@ -83,15 +85,18 @@ func (s *ProcessorTestSuite) SetupTest() {
 			s.logErrorCalled = true
 		},
 	}
+
+	s.wg = &sync.WaitGroup{}
 }
 
 func (s ProcessorTestSuite) processor() processor {
-	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote, s.logger)
+	return NewProcessor(s.localGather, s.remoteGather, s.putToRemote, s.removeFromRemote, s.logger, s.wg)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
 	s.processor().Process()
 	s.True(s.localGatherCalled)
+	s.wg.Wait()
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
@@ -108,6 +113,8 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 
 	err := s.processor().Process()
 
+	s.wg.Wait()
+
 	s.Require().True(s.localGatherCalled)
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
@@ -118,6 +125,7 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
 	s.processor().Process()
 	s.True(s.remoteGatherCalled)
+	s.wg.Wait()
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
@@ -134,6 +142,8 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 
 	err := s.processor().Process()
 
+	s.wg.Wait()
+
 	s.Require().Error(err)
 	s.True(s.remoteGatherCalled)
 	s.Equal(expectedErr, err)
@@ -145,9 +155,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processLocalVsRemote(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -176,9 +185,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 		)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processLocalVsRemote(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -207,9 +215,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 		)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processLocalVsRemote(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -238,9 +245,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote_PushE
 		)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processLocalVsRemote(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processLocalVsRemote(local, remote)
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -252,9 +258,8 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
 	local := map[string]file{"file": newFile("file", 100)}
 	remote := map[string]file{"file": newFile("file", 100)}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processRemoteVsLocal(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote)
 
 	s.False(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -281,9 +286,8 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 		)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processRemoteVsLocal(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote)
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
@@ -312,9 +316,8 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal_Error
 		)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.processor().processRemoteVsLocal(local, remote, &wg)
+	s.wg.Add(1)
+	s.processor().processRemoteVsLocal(local, remote)
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
@@ -367,6 +370,8 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
 	}
 
 	s.processor().Process()
+
+	s.wg.Wait()
 
 	s.Equal(2, putCalledCnt)
 	s.Equal(1, removeCalledCnt)

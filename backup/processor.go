@@ -16,12 +16,14 @@ type processor struct {
 	putToRemote       func(string) error
 	removeFromRemote  func(string) error
 	logger            BackupLogger
+	wg                *sync.WaitGroup
 }
 
 func NewProcessor(
 	localGather, remoteGather func() (map[string]file, error),
 	putToRemote, removeFromRemote func(string) error,
 	log BackupLogger,
+	wg *sync.WaitGroup,
 ) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
@@ -29,6 +31,7 @@ func NewProcessor(
 		putToRemote:       putToRemote,
 		removeFromRemote:  removeFromRemote,
 		logger:            log,
+		wg:                wg,
 	}
 }
 
@@ -36,15 +39,15 @@ func (p processor) Process() (err error) {
 	localResultChan := make(chan gatherResult)
 	remoteResultChan := make(chan gatherResult)
 
-	go func(out chan<- gatherResult) {
+	go func() {
 		files, err := p.gatherLocalFiles()
-		out <- gatherResult{result: files, err: err}
-	}(localResultChan)
+		localResultChan <- gatherResult{result: files, err: err}
+	}()
 
-	go func(out chan<- gatherResult) {
+	go func() {
 		files, err := p.gatherRemoteFiles()
-		out <- gatherResult{result: files, err: err}
-	}(remoteResultChan)
+		remoteResultChan <- gatherResult{result: files, err: err}
+	}()
 
 	local := <-localResultChan
 	if local.err != nil {
@@ -55,6 +58,7 @@ func (p processor) Process() (err error) {
 		return local.err
 	}
 
+	//FIXME If the remote is somehow wrong then this hangs!
 	remote := <-remoteResultChan
 	if remote.err != nil {
 		p.logger.Error(LogEntry{
@@ -67,19 +71,15 @@ func (p processor) Process() (err error) {
 	defer close(localResultChan)
 	defer close(remoteResultChan)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go p.processLocalVsRemote(local.result, remote.result, &wg)
-	go p.processRemoteVsLocal(local.result, remote.result, &wg)
-
-	wg.Wait()
+	p.wg.Add(2)
+	go p.processLocalVsRemote(local.result, remote.result)
+	go p.processRemoteVsLocal(local.result, remote.result)
 
 	return
 }
 
-func (p processor) processLocalVsRemote(local, remote map[string]file, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p processor) processLocalVsRemote(local, remote map[string]file) {
+	defer p.wg.Done()
 
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
@@ -115,8 +115,8 @@ func (p processor) processLocalVsRemote(local, remote map[string]file, wg *sync.
 	}
 }
 
-func (p processor) processRemoteVsLocal(local, remote map[string]file, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p processor) processRemoteVsLocal(local, remote map[string]file) {
+	defer p.wg.Done()
 
 	for rkey, rfile := range remote {
 		_, found := local[rkey]

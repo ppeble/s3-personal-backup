@@ -28,7 +28,7 @@ type LoggerTestSuite struct {
 
 	report    chan LogEntry
 	reportMsg LogEntry
-	wg        sync.WaitGroup
+	wg        *sync.WaitGroup
 
 	logger BackupLogger
 }
@@ -38,7 +38,8 @@ func (s *LoggerTestSuite) SetupTest() {
 		messages: make([]string, 0),
 	}
 	s.report = make(chan LogEntry)
-	s.logger = NewLogger(s.sliceLogger, s.report)
+	s.wg = &sync.WaitGroup{}
+	s.logger = NewLogger(s.sliceLogger, s.report, s.wg)
 
 	s.wg.Add(1)
 	go func() {

@@ -2,8 +2,8 @@ package backup
 
 import (
 	"log"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -36,39 +36,32 @@ func (s *ReporterTestSuite) SetupTest() {
 }
 
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.reporter.Run(&wg)
+	go s.reporter.Run()
 
 	expectedEntry := LogEntry{message: "test", file: "file1"}
 	s.in <- expectedEntry
-	s.done <- struct{}{}
 
-	wg.Wait()
+	s.done <- struct{}{}
 	s.Equal(s.reporter.entries[0], expectedEntry)
 }
 
 func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.reporter.Run(&wg)
+	go s.reporter.Run()
 	s.done <- struct{}{}
+	time.Sleep(10 * time.Millisecond) // Need to give Run() time to complete
 
-	wg.Wait()
-	s.Contains(s.sliceLogger.messages[0], "Received done signal, stopping reporting process")
+	s.Contains(s.sliceLogger.messages[0], "Received done signal, waiting for all processes to finish")
 }
 
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.reporter.Run(&wg)
+	go s.reporter.Run()
 
 	s.in <- LogEntry{message: "test1", file: "file1"}
 	s.in <- LogEntry{message: "test2", file: "file2"}
 	s.in <- LogEntry{message: "test3", file: "file3"}
-	s.done <- struct{}{}
 
-	wg.Wait()
+	s.done <- struct{}{}
+	time.Sleep(10 * time.Millisecond) // Need to give Run() time to complete
 
 	s.reporter.Print()
 
