@@ -178,7 +178,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 		s.logInfoCalled = true
 		s.Equal(
 			LogEntry{
-				message: fmt.Sprintf("mismatch, pushing to remote OLD - %s | NEW - %s", remote["file"], local["file"]),
+				message: fmt.Sprintf("%s pushed to remote", local["file"]),
 				file:    "file",
 			},
 			i,
@@ -187,6 +187,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 
 	s.wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote)
+	s.wg.Wait()
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -208,7 +209,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 		s.logInfoCalled = true
 		s.Equal(
 			LogEntry{
-				message: fmt.Sprintf("not found, pushing to remote NEW - %s", local["file"]),
+				message: fmt.Sprintf("%s pushed to remote", local["file"]),
 				file:    "file",
 			},
 			i,
@@ -217,6 +218,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 
 	s.wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote)
+	s.wg.Wait()
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -247,6 +249,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote_PushE
 
 	s.wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote)
+	s.wg.Wait()
 
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
@@ -279,7 +282,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 		s.logInfoCalled = true
 		s.Equal(
 			LogEntry{
-				message: fmt.Sprintf("'%s' not found locally, removing from remote", remote["file"]),
+				message: fmt.Sprintf("%s not found locally, removing from remote", remote["file"]),
 				file:    "file",
 			},
 			i,
@@ -288,6 +291,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 
 	s.wg.Add(1)
 	s.processor().processRemoteVsLocal(local, remote)
+	s.wg.Wait()
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
@@ -309,7 +313,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal_Error
 		s.logErrorCalled = true
 		s.Equal(
 			LogEntry{
-				message: fmt.Sprintf("'%s' not found locally but unable to remove from remote, error: '%s'", remote["file"], expectedErr.Error()),
+				message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", remote["file"], expectedErr.Error()),
 				file:    "file",
 			},
 			i,
@@ -318,6 +322,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal_Error
 
 	s.wg.Add(1)
 	s.processor().processRemoteVsLocal(local, remote)
+	s.wg.Wait()
 
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
