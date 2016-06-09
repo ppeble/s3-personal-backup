@@ -83,41 +83,35 @@ func (p processor) processLocalVsRemote(local, remote map[string]file) {
 	actionChan := make(chan file, 10)
 
 	for i := 0; i < 5; i++ {
-		go func() {
-			for {
-				file := <-actionChan
-				err := p.putToRemote(file.name)
-				if err != nil {
-					p.logger.Error(LogEntry{
-						message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
-						file:    file.name,
-					})
-				} else {
-					p.logger.Info(LogEntry{
-						message: fmt.Sprintf("%s pushed to remote", file),
-						file:    file.name,
-					})
-				}
-
-				p.wg.Done()
-			}
-		}()
+		go p.remotePushWorker(actionChan)
 	}
 
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
-		push := false
-
-		if !found {
-			push = true
-		} else if !isEqual(lfile, rfile) {
-			push = true
-		}
-
-		if push == true {
+		if !found || !isEqual(lfile, rfile) {
 			p.wg.Add(1)
 			actionChan <- lfile
 		}
+	}
+}
+
+func (p processor) remotePushWorker(in <-chan file) {
+	for {
+		file := <-in
+		err := p.putToRemote(file.name)
+		if err != nil {
+			p.logger.Error(LogEntry{
+				message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
+				file:    file.name,
+			})
+		} else {
+			p.logger.Info(LogEntry{
+				message: fmt.Sprintf("%s pushed to remote", file),
+				file:    file.name,
+			})
+		}
+
+		p.wg.Done()
 	}
 }
 
@@ -126,27 +120,7 @@ func (p processor) processRemoteVsLocal(local, remote map[string]file) {
 	actionChan := make(chan file, 10)
 
 	for i := 0; i < 5; i++ {
-		go func() {
-			for {
-				file := <-actionChan
-				err := p.removeFromRemote(file.name)
-				if err != nil {
-					entry := LogEntry{
-						message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
-						file:    file.name,
-					}
-					p.logger.Error(entry)
-				} else {
-					entry := LogEntry{
-						message: fmt.Sprintf("%s not found locally, removing from remote", file),
-						file:    file.name,
-					}
-					p.logger.Info(entry)
-				}
-
-				p.wg.Done()
-			}
-		}()
+		go p.remoteRemoveWorker(actionChan)
 	}
 
 	for rkey, rfile := range remote {
@@ -156,4 +130,27 @@ func (p processor) processRemoteVsLocal(local, remote map[string]file) {
 			actionChan <- rfile
 		}
 	}
+}
+
+func (p processor) remoteRemoveWorker(in <-chan file) {
+	for {
+		file := <-in
+		err := p.removeFromRemote(file.name)
+		if err != nil {
+			entry := LogEntry{
+				message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
+				file:    file.name,
+			}
+			p.logger.Error(entry)
+		} else {
+			entry := LogEntry{
+				message: fmt.Sprintf("%s not found locally, removing from remote", file),
+				file:    file.name,
+			}
+			p.logger.Info(entry)
+		}
+
+		p.wg.Done()
+	}
+
 }
