@@ -6,7 +6,19 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
+
+type sliceLogger struct {
+	messages []string
+}
+
+func (l *sliceLogger) Write(b []byte) (n int, err error) {
+	msg := string(b[:])
+	l.messages = append(l.messages, msg)
+	return len(msg), nil
+}
 
 func TestReporterTestSuite(t *testing.T) {
 	suite.Run(t, new(ReporterTestSuite))
@@ -17,7 +29,7 @@ type ReporterTestSuite struct {
 
 	sliceLogger *sliceLogger
 
-	in     chan LogEntry
+	in     chan logger.LogEntry
 	done   chan struct{}
 	logger *log.Logger
 
@@ -29,7 +41,7 @@ func (s *ReporterTestSuite) SetupTest() {
 		messages: make([]string, 0),
 	}
 
-	s.in = make(chan LogEntry)
+	s.in = make(chan logger.LogEntry)
 	s.done = make(chan struct{})
 	s.logger = log.New(s.sliceLogger, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	s.reporter = NewReporter(s.in, s.done, s.logger)
@@ -38,7 +50,7 @@ func (s *ReporterTestSuite) SetupTest() {
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
-	expectedEntry := LogEntry{Message: "test", File: "file1"}
+	expectedEntry := logger.LogEntry{Message: "test", File: "file1"}
 	s.in <- expectedEntry
 
 	s.done <- struct{}{}
@@ -56,9 +68,9 @@ func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
-	s.in <- LogEntry{Message: "test1", File: "file1"}
-	s.in <- LogEntry{Message: "test2", File: "file2"}
-	s.in <- LogEntry{Message: "test3", File: "file3"}
+	s.in <- logger.LogEntry{Message: "test1", File: "file1"}
+	s.in <- logger.LogEntry{Message: "test2", File: "file2"}
+	s.in <- logger.LogEntry{Message: "test3", File: "file3"}
 
 	s.done <- struct{}{}
 	time.Sleep(10 * time.Millisecond) // Need to give Run() time to complete

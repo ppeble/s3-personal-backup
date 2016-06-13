@@ -1,18 +1,18 @@
 package worker
 
 import (
-	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 type testLogger struct {
-	logInfo  func(backup.LogEntry)
-	logError func(backup.LogEntry)
+	logInfo  func(logger.LogEntry)
+	logError func(logger.LogEntry)
 }
 
-func (l testLogger) Info(i backup.LogEntry) {
+func (l testLogger) Info(i logger.LogEntry) {
 	l.logInfo(i)
 }
 
-func (l testLogger) Error(i backup.LogEntry) {
+func (l testLogger) Error(i logger.LogEntry) {
 	l.logError(i)
 }

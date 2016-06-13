@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 func TestRemoteActionWorkerTestSuite(t *testing.T) {
@@ -55,10 +56,10 @@ func (s *RemoteActionWorkerTestSuite) SetupTest() {
 	s.logErrorCalled = false
 
 	s.logger = testLogger{
-		logInfo: func(i backup.LogEntry) {
+		logInfo: func(i logger.LogEntry) {
 			s.logInfoCalled = true
 		},
-		logError: func(i backup.LogEntry) {
+		logError: func(i logger.LogEntry) {
 			s.logErrorCalled = true
 		},
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/minio/minio-go"
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 	"github.com/ptrimble/dreamhost-personal-backup/backup/worker"
 )
 
@@ -27,13 +28,13 @@ func main() {
 	var workerWg sync.WaitGroup
 	remoteActionChan := make(chan backup.RemoteAction, 20)
 
-	reportChan := make(chan backup.LogEntry)
+	reportChan := make(chan logger.LogEntry)
 	reportDone := make(chan struct{})
 	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	reportGenerator := backup.NewReporter(reportChan, reportDone, reportOut)
 	go reportGenerator.Run()
 
-	logger := backup.NewLogger(os.Stdout, reportChan, &workerWg)
+	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
 
 	localFileProcessor := backup.NewLocalFileProcessor(targetDir)
 

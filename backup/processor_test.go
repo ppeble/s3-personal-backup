@@ -7,18 +7,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 type testLogger struct {
-	logInfo  func(LogEntry)
-	logError func(LogEntry)
+	logInfo  func(logger.LogEntry)
+	logError func(logger.LogEntry)
 }
 
-func (l testLogger) Info(i LogEntry) {
+func (l testLogger) Info(i logger.LogEntry) {
 	l.logInfo(i)
 }
 
-func (l testLogger) Error(i LogEntry) {
+func (l testLogger) Error(i logger.LogEntry) {
 	l.logError(i)
 }
 
@@ -65,10 +67,10 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.logErrorCalled = false
 
 	s.logger = testLogger{
-		logInfo: func(i LogEntry) {
+		logInfo: func(i logger.LogEntry) {
 			s.logInfoCalled = true
 		},
-		logError: func(i LogEntry) {
+		logError: func(i logger.LogEntry) {
 			s.logErrorCalled = true
 		},
 	}
@@ -101,9 +103,9 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 		return nil, expectedErr
 	}
 
-	s.logger.logError = func(i LogEntry) {
+	s.logger.logError = func(i logger.LogEntry) {
 		s.logErrorCalled = true
-		s.Equal(LogEntry{Message: "error returned while gathering local files, err: asplode!"}, i)
+		s.Equal(logger.LogEntry{Message: "error returned while gathering local files, err: asplode!"}, i)
 	}
 
 	err := s.processor().Process()
@@ -137,9 +139,9 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 		return nil, expectedErr
 	}
 
-	s.logger.logError = func(i LogEntry) {
+	s.logger.logError = func(i logger.LogEntry) {
 		s.logErrorCalled = true
-		s.Equal(LogEntry{Message: "error returned while gathering remote files, err: asplode!"}, i)
+		s.Equal(logger.LogEntry{Message: "error returned while gathering remote files, err: asplode!"}, i)
 	}
 
 	err := s.processor().Process()

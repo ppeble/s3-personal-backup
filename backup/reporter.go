@@ -2,10 +2,12 @@ package backup
 
 import (
 	"log"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 func NewReporter(
-	in <-chan LogEntry,
+	in <-chan logger.LogEntry,
 	done <-chan struct{},
 	l *log.Logger,
 ) reporter {
@@ -13,16 +15,16 @@ func NewReporter(
 		in:      in,
 		done:    done,
 		logger:  l,
-		entries: make([]LogEntry, 0),
+		entries: make([]logger.LogEntry, 0),
 	}
 }
 
 type reporter struct {
-	in     <-chan LogEntry
+	in     <-chan logger.LogEntry
 	done   <-chan struct{}
 	logger *log.Logger
 
-	entries []LogEntry
+	entries []logger.LogEntry
 }
 
 func (r *reporter) Run() {
