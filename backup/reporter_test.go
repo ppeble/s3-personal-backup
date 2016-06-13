@@ -38,7 +38,7 @@ func (s *ReporterTestSuite) SetupTest() {
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
-	expectedEntry := LogEntry{message: "test", file: "file1"}
+	expectedEntry := LogEntry{Message: "test", File: "file1"}
 	s.in <- expectedEntry
 
 	s.done <- struct{}{}
@@ -56,9 +56,9 @@ func (s *ReporterTestSuite) Test_ClosesReporterOnDone() {
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
-	s.in <- LogEntry{message: "test1", file: "file1"}
-	s.in <- LogEntry{message: "test2", file: "file2"}
-	s.in <- LogEntry{message: "test3", file: "file3"}
+	s.in <- LogEntry{Message: "test1", File: "file1"}
+	s.in <- LogEntry{Message: "test2", File: "file2"}
+	s.in <- LogEntry{Message: "test3", File: "file3"}
 
 	s.done <- struct{}{}
 	time.Sleep(10 * time.Millisecond) // Need to give Run() time to complete

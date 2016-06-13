@@ -49,7 +49,7 @@ func (s *LoggerTestSuite) SetupTest() {
 }
 
 func (s *LoggerTestSuite) Test_Info_LogsToInfoLogger() {
-	entry := LogEntry{message: "test", file: "testFile"}
+	entry := LogEntry{Message: "test", File: "testFile"}
 	s.logger.Info(entry)
 
 	s.wg.Wait()
@@ -59,7 +59,7 @@ func (s *LoggerTestSuite) Test_Info_LogsToInfoLogger() {
 }
 
 func (s *LoggerTestSuite) Test_Info_SendsEntryToReportChannel() {
-	entry := LogEntry{message: "test", file: "testFile"}
+	entry := LogEntry{Message: "test", File: "testFile"}
 	s.logger.Info(entry)
 
 	s.wg.Wait()
@@ -67,7 +67,7 @@ func (s *LoggerTestSuite) Test_Info_SendsEntryToReportChannel() {
 }
 
 func (s *LoggerTestSuite) Test_Error_LogsToErrorLogger() {
-	entry := LogEntry{message: "test", file: "testFile"}
+	entry := LogEntry{Message: "test", File: "testFile"}
 	s.logger.Error(entry)
 
 	s.wg.Wait()
@@ -77,7 +77,7 @@ func (s *LoggerTestSuite) Test_Error_LogsToErrorLogger() {
 }
 
 func (s *LoggerTestSuite) Test_Error_SendsEntryToReportChannel() {
-	entry := LogEntry{message: "test", file: "testFile"}
+	entry := LogEntry{Message: "test", File: "testFile"}
 	s.logger.Error(entry)
 
 	s.wg.Wait()

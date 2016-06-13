@@ -9,42 +9,42 @@ import (
 )
 
 func Test_FileEqual_Happy(t *testing.T) {
-	f1 := file{
-		name: "file1",
-		size: 100,
+	f1 := File{
+		Name: "file1",
+		Size: 100,
 	}
 
-	f2 := file{
-		name: "file1",
-		size: 100,
+	f2 := File{
+		Name: "file1",
+		Size: 100,
 	}
 
 	assert.True(t, isEqual(f1, f2))
 }
 
 func Test_File_NotEqual_Name(t *testing.T) {
-	f1 := file{
-		name: "file1",
-		size: 100,
+	f1 := File{
+		Name: "file1",
+		Size: 100,
 	}
 
-	f2 := file{
-		name: "file2",
-		size: 100,
+	f2 := File{
+		Name: "file2",
+		Size: 100,
 	}
 
 	assert.False(t, isEqual(f1, f2))
 }
 
 func Test_File_NotEqual_Size(t *testing.T) {
-	f1 := file{
-		name: "file1",
-		size: 100,
+	f1 := File{
+		Name: "file1",
+		Size: 100,
 	}
 
-	f2 := file{
-		name: "file1",
-		size: 0,
+	f2 := File{
+		Name: "file1",
+		Size: 0,
 	}
 
 	assert.False(t, isEqual(f1, f2))
@@ -68,18 +68,18 @@ func Test_File_newFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := file{
-		name: tmpFile.Name(),
-		size: tempFileInfo.Size(),
+	expected := File{
+		Name: tmpFile.Name(),
+		Size: tempFileInfo.Size(),
 	}
 
 	assert.Equal(t, expected, newFile(tmpFile.Name(), tempFileInfo.Size()))
 }
 
 func Test_File_String(t *testing.T) {
-	f1 := file{
-		name: "file1",
-		size: 100,
+	f1 := File{
+		Name: "file1",
+		Size: 100,
 	}
 
 	assert.Equal(t, "name: 'file1' - size: '100'", f1.String())

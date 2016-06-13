@@ -8,7 +8,7 @@ import (
 
 type remoteFileProcessor struct {
 	bucket   string
-	fileData map[string]file
+	fileData map[string]File
 
 	list   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
 	remove func(string, string) error
@@ -30,11 +30,11 @@ func NewRemoteFileProcessor(
 		list:     l,
 		remove:   r,
 		put:      p,
-		fileData: make(map[string]file, 0),
+		fileData: make(map[string]File, 0),
 	}, nil
 }
 
-func (p *remoteFileProcessor) Gather() (data map[string]file, err error) {
+func (p *remoteFileProcessor) Gather() (data map[string]File, err error) {
 	// Create a done channel to control 'ListObjects' go routine.
 	doneCh := make(chan struct{})
 

@@ -9,6 +9,7 @@ import (
 	"github.com/minio/minio-go"
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup/backup/worker"
 )
 
 var targetDir string
@@ -24,6 +25,7 @@ func main() {
 	}
 
 	var workerWg sync.WaitGroup
+	remoteActionChan := make(chan backup.RemoteAction, 20)
 
 	reportChan := make(chan backup.LogEntry)
 	reportDone := make(chan struct{})
@@ -45,13 +47,22 @@ func main() {
 		panic(err)
 	}
 
+	for i := 0; i < 10; i++ {
+		go worker.NewRemoteActionWorker(
+			remoteFileProcessor.Put,
+			remoteFileProcessor.Remove,
+			&workerWg,
+			remoteActionChan,
+			logger,
+		).Run()
+	}
+
 	processor := backup.NewProcessor(
 		localFileProcessor.Gather,
 		remoteFileProcessor.Gather,
-		remoteFileProcessor.Put,
-		remoteFileProcessor.Remove,
 		logger,
 		&workerWg,
+		remoteActionChan,
 	)
 
 	err = processor.Process()

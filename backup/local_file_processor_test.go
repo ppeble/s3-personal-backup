@@ -160,7 +160,7 @@ func (s *LocalProcessorTestSuite) createTempFile(directory, prefix string) *os.F
 	return tmpFile
 }
 
-func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[string]file) {
+func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[string]File) {
 	fi, err := tmpFile.Stat()
 	if err != nil {
 		s.T().Fatal(err)

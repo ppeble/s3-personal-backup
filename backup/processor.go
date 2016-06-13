@@ -6,32 +6,30 @@ import (
 )
 
 type gatherResult struct {
-	result map[string]file
+	result map[string]File
 	err    error
 }
 
 type processor struct {
-	gatherLocalFiles  func() (map[string]file, error)
-	gatherRemoteFiles func() (map[string]file, error)
-	putToRemote       func(string) error
-	removeFromRemote  func(string) error
+	gatherLocalFiles  func() (map[string]File, error)
+	gatherRemoteFiles func() (map[string]File, error)
 	logger            BackupLogger
 	wg                *sync.WaitGroup
+	remoteActions     chan<- RemoteAction
 }
 
 func NewProcessor(
-	localGather, remoteGather func() (map[string]file, error),
-	putToRemote, removeFromRemote func(string) error,
+	localGather, remoteGather func() (map[string]File, error),
 	log BackupLogger,
 	wg *sync.WaitGroup,
+	rac chan<- RemoteAction,
 ) processor {
 	return processor{
 		gatherLocalFiles:  localGather,
 		gatherRemoteFiles: remoteGather,
-		putToRemote:       putToRemote,
-		removeFromRemote:  removeFromRemote,
 		logger:            log,
 		wg:                wg,
+		remoteActions:     rac,
 	}
 }
 
@@ -52,7 +50,7 @@ func (p processor) Process() (err error) {
 	local := <-localResultChan
 	if local.err != nil {
 		p.logger.Error(LogEntry{
-			message: fmt.Sprintf("error returned while gathering local files, err: %s", local.err),
+			Message: fmt.Sprintf("error returned while gathering local files, err: %s", local.err),
 		})
 
 		return local.err
@@ -62,7 +60,7 @@ func (p processor) Process() (err error) {
 	remote := <-remoteResultChan
 	if remote.err != nil {
 		p.logger.Error(LogEntry{
-			message: fmt.Sprintf("error returned while gathering remote files, err: %s", remote.err),
+			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", remote.err),
 		})
 
 		return remote.err
@@ -78,79 +76,32 @@ func (p processor) Process() (err error) {
 	return
 }
 
-func (p processor) processLocalVsRemote(local, remote map[string]file) {
+func (p processor) processLocalVsRemote(local, remote map[string]File) {
 	defer p.wg.Done()
-	actionChan := make(chan file, 10)
-
-	for i := 0; i < 5; i++ {
-		go p.remotePushWorker(actionChan)
-	}
 
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
 		if !found || !isEqual(lfile, rfile) {
 			p.wg.Add(1)
-			actionChan <- lfile
+			p.remoteActions <- RemoteAction{
+				Type: PUSH,
+				File: lfile,
+			}
 		}
 	}
 }
 
-func (p processor) remotePushWorker(in <-chan file) {
-	for {
-		file := <-in
-		err := p.putToRemote(file.name)
-		if err != nil {
-			p.logger.Error(LogEntry{
-				message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
-				file:    file.name,
-			})
-		} else {
-			p.logger.Info(LogEntry{
-				message: fmt.Sprintf("%s pushed to remote", file),
-				file:    file.name,
-			})
-		}
-
-		p.wg.Done()
-	}
-}
-
-func (p processor) processRemoteVsLocal(local, remote map[string]file) {
+func (p processor) processRemoteVsLocal(local, remote map[string]File) {
 	defer p.wg.Done()
-	actionChan := make(chan file, 10)
-
-	for i := 0; i < 5; i++ {
-		go p.remoteRemoveWorker(actionChan)
-	}
 
 	for rkey, rfile := range remote {
 		_, found := local[rkey]
 		if !found {
 			p.wg.Add(1)
-			actionChan <- rfile
+			p.remoteActions <- RemoteAction{
+				Type: REMOVE,
+				File: rfile,
+			}
 		}
 	}
-}
-
-func (p processor) remoteRemoveWorker(in <-chan file) {
-	for {
-		file := <-in
-		err := p.removeFromRemote(file.name)
-		if err != nil {
-			entry := LogEntry{
-				message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
-				file:    file.name,
-			}
-			p.logger.Error(entry)
-		} else {
-			entry := LogEntry{
-				message: fmt.Sprintf("%s not found locally, removing from remote", file),
-				file:    file.name,
-			}
-			p.logger.Info(entry)
-		}
-
-		p.wg.Done()
-	}
-
 }

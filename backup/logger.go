@@ -33,12 +33,12 @@ type backupLogger struct {
 }
 
 func (l backupLogger) Info(i LogEntry) {
-	l.infoLog.Println("file: '" + i.file + "' - message: '" + i.message + "'")
+	l.infoLog.Println("file: '" + i.File + "' - message: '" + i.Message + "'")
 	l.sendToReporter(i)
 }
 
 func (l backupLogger) Error(i LogEntry) {
-	l.errorLog.Println("file: '" + i.file + "' - message: '" + i.message + "'")
+	l.errorLog.Println("file: '" + i.File + "' - message: '" + i.Message + "'")
 	l.sendToReporter(i)
 }
 
