@@ -19,7 +19,7 @@ func Test_FileEqual_Happy(t *testing.T) {
 		Size: 100,
 	}
 
-	assert.True(t, isEqual(f1, f2))
+	assert.True(t, f1.Equal(f2))
 }
 
 func Test_File_NotEqual_Name(t *testing.T) {
@@ -33,7 +33,7 @@ func Test_File_NotEqual_Name(t *testing.T) {
 		Size: 100,
 	}
 
-	assert.False(t, isEqual(f1, f2))
+	assert.False(t, f1.Equal(f2))
 }
 
 func Test_File_NotEqual_Size(t *testing.T) {
@@ -47,7 +47,7 @@ func Test_File_NotEqual_Size(t *testing.T) {
 		Size: 0,
 	}
 
-	assert.False(t, isEqual(f1, f2))
+	assert.False(t, f1.Equal(f2))
 }
 
 func Test_File_newFile(t *testing.T) {

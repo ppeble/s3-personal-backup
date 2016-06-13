@@ -83,7 +83,7 @@ func (p processor) processLocalVsRemote(local, remote map[string]File) {
 
 	for lkey, lfile := range local {
 		rfile, found := remote[lkey]
-		if !found || !isEqual(lfile, rfile) {
+		if !found || !lfile.Equal(rfile) {
 			p.wg.Add(1)
 			p.remoteActions <- RemoteAction{
 				Type: PUSH,

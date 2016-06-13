@@ -12,10 +12,6 @@ type File struct {
 	Size int64
 }
 
-func (f File) String() string {
-	return fmt.Sprintf("name: '%s' - size: '%d'", f.Name, f.Size)
-}
-
 func newFile(name string, size int64) File {
 	return File{
 		Name: name,
@@ -23,9 +19,11 @@ func newFile(name string, size int64) File {
 	}
 }
 
-//TODO could this be a method off of the file struct?
-// For example: f1.Equal(f2)?
-func isEqual(f1, f2 File) bool {
-	return f1.Name == f2.Name &&
-		f1.Size == f2.Size
+func (f File) String() string {
+	return fmt.Sprintf("name: '%s' - size: '%d'", f.Name, f.Size)
+}
+
+func (f File) Equal(otherFile File) bool {
+	return f.Name == otherFile.Name &&
+		f.Size == otherFile.Size
 }
