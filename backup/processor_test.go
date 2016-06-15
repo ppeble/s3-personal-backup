@@ -2,7 +2,6 @@ package backup
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 
@@ -252,7 +251,6 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
 	go func() {
 		for {
 			action := <-s.remoteAction
-			fmt.Printf("action: %#v\n", action)
 			if action.Type == PUSH {
 				putCalledCnt++
 			} else if action.Type == REMOVE {

@@ -3,18 +3,21 @@ package backup
 import (
 	"errors"
 	"os"
+	"strconv"
 )
 
 type Flags struct {
-	TargetDir    string
-	S3Host       string
-	S3AccessKey  string
-	S3SecretKey  string
-	S3BucketName string
+	TargetDir         string
+	S3Host            string
+	S3AccessKey       string
+	S3SecretKey       string
+	S3BucketName      string
+	RemoteWorkerCount int
 }
 
 type CompiledConfig struct {
-	TargetDir string
+	TargetDir         string
+	RemoteWorkerCount int
 
 	S3Host, S3AccessKey, S3SecretKey, S3BucketName string
 }
@@ -27,6 +30,12 @@ func CompileConfig(flags Flags) (CompiledConfig, error) {
 	s3AccessKeyViaEnv := os.Getenv("PERSONAL_BACKUP_S3_ACCESS_KEY")
 	s3SecretKeyViaEnv := os.Getenv("PERSONAL_BACKUP_S3_SECRET_KEY")
 	s3BucketNameViaEnv := os.Getenv("PERSONAL_BACKUP_S3_BUCKET_NAME")
+
+	var remoteWorkerCountViaEnv int
+	remoteWorkerCountViaEnv, err := strconv.Atoi(os.Getenv("PERSONAL_BACKUP_REMOTE_WORKER_COUNT"))
+	if err != nil {
+		remoteWorkerCountViaEnv = 0
+	}
 
 	if flags.TargetDir != "" {
 		c.TargetDir = flags.TargetDir
@@ -66,6 +75,14 @@ func CompileConfig(flags Flags) (CompiledConfig, error) {
 		c.S3BucketName = s3BucketNameViaEnv
 	} else {
 		return c, errors.New("s3 bucket name must be specified via either command line (-s3BucketName) or env var (PERSONAL_BACKUP_S3_BUCKET_NAME)")
+	}
+
+	if flags.RemoteWorkerCount != 0 {
+		c.RemoteWorkerCount = flags.RemoteWorkerCount
+	} else if remoteWorkerCountViaEnv != 0 {
+		c.RemoteWorkerCount = remoteWorkerCountViaEnv
+	} else {
+		c.RemoteWorkerCount = 10
 	}
 
 	return c, nil

@@ -31,6 +31,10 @@ The `dreamhost_personal_backup` binary requires the following information:
 * S3 secret key - specified via the `s3SecretKey <key>` flag or by setting the `PERSONAL_BACKUP_S3_SECRET_KEY` env variable
 * S3 bucket name - specified via the `-s3BucketName` flag or the `PERSONAL_BACKUP_S3_BUCKET_NAME` env variable
 
+In addition, there are optional fields:
+
+* remote worker count - number of workers to run in parallel to process actions on the remote host. Used currently to (primitively) limit bandwidth usage. Fewer workers means fewer simultaneous actions (like uploading) run against the S3 host. Specified via the `-remoteWorkerCount` flag or the `PERSONAL_BACKUP_REMOTE_WORKER_COUNT` env variable
+
 In all instances the command line flag will take priority over the environment variable.
 
 ## TODO

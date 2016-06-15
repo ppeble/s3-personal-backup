@@ -44,7 +44,7 @@ func main() {
 		panic(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < config.RemoteWorkerCount; i++ {
 		go worker.NewRemoteActionWorker(
 			remoteFileProcessor.Put,
 			remoteFileProcessor.Remove,
@@ -80,6 +80,7 @@ func processVars() backup.CompiledConfig {
 	flag.StringVar(&flags.S3AccessKey, "s3AccessKey", "", "S3 access key.")
 	flag.StringVar(&flags.S3SecretKey, "s3SecretKey", "", "S3 secret key.")
 	flag.StringVar(&flags.S3BucketName, "s3BucketName", "", "S3 Bucket Name.")
+	flag.IntVar(&flags.RemoteWorkerCount, "remoteWorkerCount", 0, "Numer of workers performing actions against S3 host.")
 	flag.Parse()
 
 	compiledConfig, err := backup.CompileConfig(flags)
