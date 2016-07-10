@@ -33,10 +33,10 @@ type ProcessorTestSuite struct {
 	localGatherCalled  int
 	remoteGatherCalled bool
 
-	localGather  []func() (map[string]File, error)
-	remoteGather func() (map[string]File, error)
+	localGather  []func() (map[Filename]File, error)
+	remoteGather func() (map[Filename]File, error)
 
-	localData, remoteData map[string]File
+	localData, remoteData map[Filename]File
 
 	logInfoCalled, logErrorCalled bool
 	logger                        testLogger
@@ -49,20 +49,20 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.localGatherCalled = 0
 	s.remoteGatherCalled = false
 
-	s.localData = make(map[string]File)
+	s.localData = make(map[Filename]File)
 	s.localData["local1"] = newFile("local1", 100)
 
-	s.remoteData = make(map[string]File)
+	s.remoteData = make(map[Filename]File)
 	s.remoteData["remote1"] = newFile("remote1", 100)
 
-	s.localGather = []func() (map[string]File, error){
-		func() (map[string]File, error) {
+	s.localGather = []func() (map[Filename]File, error){
+		func() (map[Filename]File, error) {
 			s.localGatherCalled++
 			return s.localData, nil
 		},
 	}
 
-	s.remoteGather = func() (map[string]File, error) {
+	s.remoteGather = func() (map[Filename]File, error) {
 		s.remoteGatherCalled = true
 		return s.remoteData, nil
 	}
@@ -108,12 +108,12 @@ func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_MultipleLocalGathers(
 		}
 	}()
 
-	s.localGather = []func() (map[string]File, error){
-		func() (map[string]File, error) {
+	s.localGather = []func() (map[Filename]File, error){
+		func() (map[Filename]File, error) {
 			s.localGatherCalled++
 			return s.localData, nil
 		},
-		func() (map[string]File, error) {
+		func() (map[Filename]File, error) {
 			s.localGatherCalled++
 			return s.localData, nil
 		},
@@ -126,8 +126,8 @@ func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_MultipleLocalGathers(
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	expectedErr := errors.New("asplode!")
-	s.localGather = []func() (map[string]File, error){
-		func() (map[string]File, error) {
+	s.localGather = []func() (map[Filename]File, error){
+		func() (map[Filename]File, error) {
 			s.localGatherCalled++
 			return nil, expectedErr
 		},
@@ -164,7 +164,7 @@ func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 	expectedErr := errors.New("asplode!")
-	s.remoteGather = func() (map[string]File, error) {
+	s.remoteGather = func() (map[Filename]File, error) {
 		s.remoteGatherCalled = true
 		return nil, expectedErr
 	}
@@ -186,8 +186,8 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
-	local := map[string]File{"file": newFile("file", 100)}
-	remote := map[string]File{"file": newFile("file", 100)}
+	local := map[Filename]File{"file": newFile("file", 100)}
+	remote := map[Filename]File{"file": newFile("file", 100)}
 
 	s.wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote)
@@ -197,8 +197,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
-	local := map[string]File{"file": newFile("file", 100)}
-	remote := map[string]File{"file": newFile("file", 101)}
+	local := map[Filename]File{"file": newFile("file", 100)}
+	remote := map[Filename]File{"file": newFile("file", 101)}
 
 	go func() {
 		action := <-s.remoteAction
@@ -213,8 +213,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
-	local := map[string]File{"file": newFile("file", 100)}
-	remote := map[string]File{}
+	local := map[Filename]File{"file": newFile("file", 100)}
+	remote := map[Filename]File{}
 
 	go func() {
 		action := <-s.remoteAction
@@ -229,16 +229,16 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 }
 
 func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
-	local := map[string]File{"file": newFile("file", 100)}
-	remote := map[string]File{"file": newFile("file", 100)}
+	local := map[Filename]File{"file": newFile("file", 100)}
+	remote := map[Filename]File{"file": newFile("file", 100)}
 
 	s.wg.Add(1)
 	s.processor().processRemoteVsLocal(local, remote)
 }
 
 func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
-	local := map[string]File{}
-	remote := map[string]File{"file": newFile("file", 100)}
+	local := map[Filename]File{}
+	remote := map[Filename]File{"file": newFile("file", 100)}
 
 	go func() {
 		action := <-s.remoteAction
@@ -253,7 +253,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 }
 
 func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
-	local := map[string]File{
+	local := map[Filename]File{
 		"file1": newFile("file1", 100),
 		"file2": newFile("file2", 200),
 		"file3": newFile("file3", 300),
@@ -261,7 +261,7 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 		"file5": newFile("file5", 500),
 	}
 
-	remote := map[string]File{
+	remote := map[Filename]File{
 		"file1": newFile("file1", 100),
 		"file2": newFile("file2", 201),
 		"file3": newFile("file3", 300),
@@ -269,13 +269,13 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 		"file6": newFile("file6", 600),
 	}
 
-	s.localGather = []func() (map[string]File, error){
-		func() (map[string]File, error) {
+	s.localGather = []func() (map[Filename]File, error){
+		func() (map[Filename]File, error) {
 			return local, nil
 		},
 	}
 
-	s.remoteGather = func() (map[string]File, error) {
+	s.remoteGather = func() (map[Filename]File, error) {
 		return remote, nil
 	}
 
@@ -304,7 +304,7 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 }
 
 func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
-	local1 := map[string]File{
+	local1 := map[Filename]File{
 		"local1/file1": newFile("local1/file1", 100),
 		"local1/file2": newFile("local1/file2", 200),
 		"local1/file3": newFile("local1/file3", 300),
@@ -312,12 +312,12 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 		"local1/file5": newFile("local1/file5", 500),
 	}
 
-	local2 := map[string]File{
+	local2 := map[Filename]File{
 		"local2/file1": newFile("local2/file1", 100),
 		"local2/file2": newFile("local2/file2", 200),
 	}
 
-	remote := map[string]File{
+	remote := map[Filename]File{
 		"local1/file1": newFile("local1/file1", 100),
 		"local1/file2": newFile("local1/file2", 201),
 		"local1/file3": newFile("local1/file3", 300),
@@ -328,16 +328,16 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 		"local2/file3": newFile("local2/file3", 300),
 	}
 
-	s.localGather = []func() (map[string]File, error){
-		func() (map[string]File, error) {
+	s.localGather = []func() (map[Filename]File, error){
+		func() (map[Filename]File, error) {
 			return local1, nil
 		},
-		func() (map[string]File, error) {
+		func() (map[Filename]File, error) {
 			return local2, nil
 		},
 	}
 
-	s.remoteGather = func() (map[string]File, error) {
+	s.remoteGather = func() (map[Filename]File, error) {
 		return remote, nil
 	}
 

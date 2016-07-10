@@ -7,18 +7,18 @@ import (
 
 type localFileProcessor struct {
 	targetDir string
-	fileData  map[string]File
+	fileData  map[Filename]File
 }
 
 //FIXME This should return an error if the target is blank/missing
 func NewLocalFileProcessor(t string) localFileProcessor {
 	return localFileProcessor{
 		targetDir: t,
-		fileData:  make(map[string]File, 0),
+		fileData:  make(map[Filename]File, 0),
 	}
 }
 
-func (p *localFileProcessor) Gather() (data map[string]File, err error) {
+func (p *localFileProcessor) Gather() (data map[Filename]File, err error) {
 	err = filepath.Walk(p.targetDir, p.processFile)
 	if err != nil {
 		return
@@ -35,7 +35,7 @@ func (p *localFileProcessor) processFile(filePath string, fi os.FileInfo, err er
 	}
 
 	if !fi.IsDir() {
-		p.fileData[filePath] = newFile(filePath, fi.Size())
+		p.fileData[Filename(filePath)] = newFile(filePath, fi.Size())
 	}
 
 	return

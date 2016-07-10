@@ -8,16 +8,16 @@ import (
 )
 
 type processor struct {
-	localGathers      []func() (map[string]File, error)
-	gatherRemoteFiles func() (map[string]File, error)
+	localGathers      []func() (map[Filename]File, error)
+	gatherRemoteFiles func() (map[Filename]File, error)
 	logger            logger.BackupLogger
 	wg                *sync.WaitGroup
 	remoteActions     chan<- RemoteAction
 }
 
 func NewProcessor(
-	localGathers []func() (map[string]File, error),
-	remoteGather func() (map[string]File, error),
+	localGathers []func() (map[Filename]File, error),
+	remoteGather func() (map[Filename]File, error),
 	log logger.BackupLogger,
 	wg *sync.WaitGroup,
 	rac chan<- RemoteAction,
@@ -57,8 +57,8 @@ func (p processor) Process() (err error) {
 	return
 }
 
-func (p processor) runLocalGathers(localGathers []func() (map[string]File, error)) (map[string]File, error) {
-	results := make([]map[string]File, 0)
+func (p processor) runLocalGathers(localGathers []func() (map[Filename]File, error)) (map[Filename]File, error) {
+	results := make([]map[Filename]File, 0)
 
 	for _, localGather := range localGathers {
 		localFiles, err := localGather()
@@ -69,7 +69,7 @@ func (p processor) runLocalGathers(localGathers []func() (map[string]File, error
 		results = append(results, localFiles)
 	}
 
-	combinedResults := make(map[string]File)
+	combinedResults := make(map[Filename]File)
 	for _, r := range results {
 		for k, v := range r {
 			combinedResults[k] = v
@@ -79,7 +79,7 @@ func (p processor) runLocalGathers(localGathers []func() (map[string]File, error
 	return combinedResults, nil
 }
 
-func (p processor) processLocalVsRemote(local, remote map[string]File) {
+func (p processor) processLocalVsRemote(local, remote map[Filename]File) {
 	defer p.wg.Done()
 
 	for lkey, lfile := range local {
@@ -94,7 +94,7 @@ func (p processor) processLocalVsRemote(local, remote map[string]File) {
 	}
 }
 
-func (p processor) processRemoteVsLocal(local, remote map[string]File) {
+func (p processor) processRemoteVsLocal(local, remote map[Filename]File) {
 	defer p.wg.Done()
 
 	for rkey, rfile := range remote {

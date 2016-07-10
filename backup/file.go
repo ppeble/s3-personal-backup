@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+type Filename string
+
 // These are the only two things that I am
 // verifying for differences at this time. I am thinking
 // about expanding it but for the time being this is enough.

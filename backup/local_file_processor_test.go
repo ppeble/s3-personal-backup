@@ -160,7 +160,7 @@ func (s *LocalProcessorTestSuite) createTempFile(directory, prefix string) *os.F
 	return tmpFile
 }
 
-func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[string]File) {
+func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[Filename]File) {
 	fi, err := tmpFile.Stat()
 	if err != nil {
 		s.T().Fatal(err)
@@ -168,7 +168,7 @@ func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[string]File
 
 	expected := newFile(tmpFile.Name(), fi.Size())
 
-	actual, found := data[tmpFile.Name()]
+	actual, found := data[Filename(tmpFile.Name())]
 	s.True(found)
 	s.Equal(expected, actual)
 }
