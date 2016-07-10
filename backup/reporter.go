@@ -8,12 +8,10 @@ import (
 
 func NewReporter(
 	in <-chan logger.LogEntry,
-	done <-chan struct{},
 	l *log.Logger,
 ) reporter {
 	return reporter{
 		in:      in,
-		done:    done,
 		logger:  l,
 		entries: make([]logger.LogEntry, 0),
 	}
@@ -21,7 +19,6 @@ func NewReporter(
 
 type reporter struct {
 	in     <-chan logger.LogEntry
-	done   <-chan struct{}
 	logger *log.Logger
 
 	entries []logger.LogEntry
@@ -29,13 +26,8 @@ type reporter struct {
 
 func (r *reporter) Run() {
 	for {
-		select {
-		case entry := <-r.in:
-			r.entries = append(r.entries, entry)
-		case <-r.done:
-			r.logger.Println("Received done signal, waiting for all processes to finish")
-			return
-		}
+		entry := <-r.in
+		r.entries = append(r.entries, entry)
 	}
 }
 
