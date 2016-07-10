@@ -84,6 +84,7 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_HandlePush() {
 	s.True(s.logInfoCalled)
 }
 
+//FIXME This seems to be a flapping test. Not sure why.
 func (s *RemoteActionWorkerTestSuite) Test_Run_Push_LogsErrorOnFailure() {
 	s.putToRemote = func(f string) error {
 		s.putToRemoteCalled = true
@@ -94,10 +95,10 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_Push_LogsErrorOnFailure() {
 
 	s.input <- backup.RemoteAction{Type: backup.PUSH, File: s.file}
 
-	s.True(s.putToRemoteCalled)
-	s.False(s.removeFromRemoteCalled)
-	s.False(s.logInfoCalled)
-	s.True(s.logErrorCalled)
+	s.True(s.putToRemoteCalled, "putToRemote should be called")
+	s.False(s.removeFromRemoteCalled, "removeFromRemote should not be called")
+	s.False(s.logInfoCalled, "Info should not be called")
+	s.True(s.logErrorCalled, "Error should be called")
 }
 
 func (s *RemoteActionWorkerTestSuite) Test_Run_HandleRemove() {

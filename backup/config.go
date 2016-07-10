@@ -4,10 +4,11 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Flags struct {
-	TargetDir         string
+	TargetDirs        string
 	S3Host            string
 	S3AccessKey       string
 	S3SecretKey       string
@@ -16,7 +17,7 @@ type Flags struct {
 }
 
 type CompiledConfig struct {
-	TargetDir         string
+	TargetDirs        []string
 	RemoteWorkerCount int
 
 	S3Host, S3AccessKey, S3SecretKey, S3BucketName string
@@ -25,7 +26,7 @@ type CompiledConfig struct {
 func CompileConfig(flags Flags) (CompiledConfig, error) {
 	c := CompiledConfig{}
 
-	targetDirViaEnv := os.Getenv("PERSONAL_BACKUP_TARGET_DIR")
+	targetDirsViaEnv := os.Getenv("PERSONAL_BACKUP_TARGET_DIRS")
 	s3HostViaEnv := os.Getenv("PERSONAL_BACKUP_S3_HOST")
 	s3AccessKeyViaEnv := os.Getenv("PERSONAL_BACKUP_S3_ACCESS_KEY")
 	s3SecretKeyViaEnv := os.Getenv("PERSONAL_BACKUP_S3_SECRET_KEY")
@@ -37,12 +38,12 @@ func CompileConfig(flags Flags) (CompiledConfig, error) {
 		remoteWorkerCountViaEnv = 0
 	}
 
-	if flags.TargetDir != "" {
-		c.TargetDir = flags.TargetDir
-	} else if targetDirViaEnv != "" {
-		c.TargetDir = targetDirViaEnv
+	if flags.TargetDirs != "" {
+		c.TargetDirs = strings.Split(flags.TargetDirs, ",")
+	} else if targetDirsViaEnv != "" {
+		c.TargetDirs = strings.Split(targetDirsViaEnv, ",")
 	} else {
-		return c, errors.New("target dir must be specified via either command line (-targetDir) or env var (PERSONAL_BACKUP_TARGET_DIR)")
+		return c, errors.New("target dir must be specified via either command line (-targetDirs) or env var (PERSONAL_BACKUP_TARGET_DIRS)")
 	}
 
 	if flags.S3Host != "" {

@@ -30,10 +30,13 @@ func TestProcessorTestSuite(t *testing.T) {
 type ProcessorTestSuite struct {
 	suite.Suite
 
-	localGatherCalled, remoteGatherCalled bool
+	localGatherCalled  int
+	remoteGatherCalled bool
 
-	localGather, remoteGather func() (map[string]File, error)
-	localData, remoteData     map[string]File
+	localGather  []func() (map[string]File, error)
+	remoteGather func() (map[string]File, error)
+
+	localData, remoteData map[string]File
 
 	logInfoCalled, logErrorCalled bool
 	logger                        testLogger
@@ -43,7 +46,7 @@ type ProcessorTestSuite struct {
 }
 
 func (s *ProcessorTestSuite) SetupTest() {
-	s.localGatherCalled = false
+	s.localGatherCalled = 0
 	s.remoteGatherCalled = false
 
 	s.localData = make(map[string]File)
@@ -52,9 +55,11 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.remoteData = make(map[string]File)
 	s.remoteData["remote1"] = newFile("remote1", 100)
 
-	s.localGather = func() (map[string]File, error) {
-		s.localGatherCalled = true
-		return s.localData, nil
+	s.localGather = []func() (map[string]File, error){
+		func() (map[string]File, error) {
+			s.localGatherCalled++
+			return s.localData, nil
+		},
 	}
 
 	s.remoteGather = func() (map[string]File, error) {
@@ -82,7 +87,7 @@ func (s ProcessorTestSuite) processor() processor {
 	return NewProcessor(s.localGather, s.remoteGather, s.logger, s.wg, s.remoteAction)
 }
 
-func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
+func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_OneLocalGather() {
 	go func() {
 		for {
 			<-s.remoteAction
@@ -91,15 +96,41 @@ func (s *ProcessorTestSuite) Test_Process_CallsLocalGather() {
 	}()
 
 	s.processor().Process()
-	s.True(s.localGatherCalled)
+	s.Equal(1, s.localGatherCalled)
+	s.wg.Wait()
+}
+
+func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_MultipleLocalGathers() {
+	go func() {
+		for {
+			<-s.remoteAction
+			s.wg.Done()
+		}
+	}()
+
+	s.localGather = []func() (map[string]File, error){
+		func() (map[string]File, error) {
+			s.localGatherCalled++
+			return s.localData, nil
+		},
+		func() (map[string]File, error) {
+			s.localGatherCalled++
+			return s.localData, nil
+		},
+	}
+
+	s.processor().Process()
+	s.Equal(2, s.localGatherCalled)
 	s.wg.Wait()
 }
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	expectedErr := errors.New("asplode!")
-	s.localGather = func() (map[string]File, error) {
-		s.localGatherCalled = true
-		return nil, expectedErr
+	s.localGather = []func() (map[string]File, error){
+		func() (map[string]File, error) {
+			s.localGatherCalled++
+			return nil, expectedErr
+		},
 	}
 
 	s.logger.logError = func(i logger.LogEntry) {
@@ -111,7 +142,7 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 
 	s.wg.Wait()
 
-	s.Require().True(s.localGatherCalled)
+	s.Require().Equal(1, s.localGatherCalled)
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
 	s.True(s.logErrorCalled)
@@ -221,7 +252,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 	s.wg.Wait()
 }
 
-func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
+func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 	local := map[string]File{
 		"file1": newFile("file1", 100),
 		"file2": newFile("file2", 200),
@@ -238,8 +269,10 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
 		"file6": newFile("file6", 600),
 	}
 
-	s.localGather = func() (map[string]File, error) {
-		return local, nil
+	s.localGather = []func() (map[string]File, error){
+		func() (map[string]File, error) {
+			return local, nil
+		},
 	}
 
 	s.remoteGather = func() (map[string]File, error) {
@@ -266,6 +299,68 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences() {
 
 	s.wg.Wait()
 
-	s.Equal(2, putCalledCnt)
-	s.Equal(1, removeCalledCnt)
+	s.Equal(2, putCalledCnt, "putCalledCnt does not match")
+	s.Equal(1, removeCalledCnt, "removeCalledCnt does not match")
+}
+
+func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
+	local1 := map[string]File{
+		"local1/file1": newFile("local1/file1", 100),
+		"local1/file2": newFile("local1/file2", 200),
+		"local1/file3": newFile("local1/file3", 300),
+		"local1/file4": newFile("local1/file4", 400),
+		"local1/file5": newFile("local1/file5", 500),
+	}
+
+	local2 := map[string]File{
+		"local2/file1": newFile("local2/file1", 100),
+		"local2/file2": newFile("local2/file2", 200),
+	}
+
+	remote := map[string]File{
+		"local1/file1": newFile("local1/file1", 100),
+		"local1/file2": newFile("local1/file2", 201),
+		"local1/file3": newFile("local1/file3", 300),
+		"local1/file4": newFile("local1/file4", 400),
+		"local1/file6": newFile("local1/file6", 600),
+		"local2/file1": newFile("local2/file1", 100),
+		"local2/file2": newFile("local2/file2", 201),
+		"local2/file3": newFile("local2/file3", 300),
+	}
+
+	s.localGather = []func() (map[string]File, error){
+		func() (map[string]File, error) {
+			return local1, nil
+		},
+		func() (map[string]File, error) {
+			return local2, nil
+		},
+	}
+
+	s.remoteGather = func() (map[string]File, error) {
+		return remote, nil
+	}
+
+	putCalledCnt := 0
+	removeCalledCnt := 0
+	go func() {
+		for {
+			action := <-s.remoteAction
+			if action.Type == PUSH {
+				putCalledCnt++
+			} else if action.Type == REMOVE {
+				removeCalledCnt++
+			} else {
+				s.T().Errorf("Unknown action type")
+			}
+			s.wg.Done()
+		}
+	}()
+
+	s.processor().Process()
+
+	s.wg.Wait()
+
+	s.Equal(3, putCalledCnt, "putCalledCnt does not match")
+	s.Equal(2, removeCalledCnt, "removeCalledCnt does not match")
 }

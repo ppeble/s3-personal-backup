@@ -7,13 +7,8 @@ import (
 	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
-type gatherResult struct {
-	result map[string]File
-	err    error
-}
-
 type processor struct {
-	gatherLocalFiles  func() (map[string]File, error)
+	localGathers      []func() (map[string]File, error)
 	gatherRemoteFiles func() (map[string]File, error)
 	logger            logger.BackupLogger
 	wg                *sync.WaitGroup
@@ -21,13 +16,14 @@ type processor struct {
 }
 
 func NewProcessor(
-	localGather, remoteGather func() (map[string]File, error),
+	localGathers []func() (map[string]File, error),
+	remoteGather func() (map[string]File, error),
 	log logger.BackupLogger,
 	wg *sync.WaitGroup,
 	rac chan<- RemoteAction,
 ) processor {
 	return processor{
-		gatherLocalFiles:  localGather,
+		localGathers:      localGathers,
 		gatherRemoteFiles: remoteGather,
 		logger:            log,
 		wg:                wg,
@@ -36,46 +32,51 @@ func NewProcessor(
 }
 
 func (p processor) Process() (err error) {
-	localResultChan := make(chan gatherResult)
-	remoteResultChan := make(chan gatherResult)
-
-	go func() {
-		files, err := p.gatherLocalFiles()
-		localResultChan <- gatherResult{result: files, err: err}
-	}()
-
-	go func() {
-		files, err := p.gatherRemoteFiles()
-		remoteResultChan <- gatherResult{result: files, err: err}
-	}()
-
-	local := <-localResultChan
-	if local.err != nil {
+	localFiles, err := p.runLocalGathers(p.localGathers)
+	if err != nil {
 		p.logger.Error(logger.LogEntry{
-			Message: fmt.Sprintf("error returned while gathering local files, err: %s", local.err),
+			Message: fmt.Sprintf("error returned while gathering local files, err: %s", err),
 		})
 
-		return local.err
+		return err
 	}
 
-	//FIXME If the remote is somehow wrong then this hangs!
-	remote := <-remoteResultChan
-	if remote.err != nil {
+	remoteFiles, err := p.gatherRemoteFiles()
+	if err != nil {
 		p.logger.Error(logger.LogEntry{
-			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", remote.err),
+			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", err),
 		})
 
-		return remote.err
+		return err
 	}
-
-	defer close(localResultChan)
-	defer close(remoteResultChan)
 
 	p.wg.Add(2)
-	go p.processLocalVsRemote(local.result, remote.result)
-	go p.processRemoteVsLocal(local.result, remote.result)
+	go p.processLocalVsRemote(localFiles, remoteFiles)
+	go p.processRemoteVsLocal(localFiles, remoteFiles)
 
 	return
+}
+
+func (p processor) runLocalGathers(localGathers []func() (map[string]File, error)) (map[string]File, error) {
+	results := make([]map[string]File, 0)
+
+	for _, localGather := range localGathers {
+		localFiles, err := localGather()
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, localFiles)
+	}
+
+	combinedResults := make(map[string]File)
+	for _, r := range results {
+		for k, v := range r {
+			combinedResults[k] = v
+		}
+	}
+
+	return combinedResults, nil
 }
 
 func (p processor) processLocalVsRemote(local, remote map[string]File) {

@@ -18,7 +18,7 @@ type ConfigTestSuite struct {
 
 func (s *ConfigTestSuite) SetupTest() {
 	s.flags = Flags{
-		TargetDir:         "targetDir",
+		TargetDirs:        "targetDir",
 		S3Host:            "s3Host",
 		S3AccessKey:       "s3AccessKey",
 		S3SecretKey:       "s3SecretKey",
@@ -26,7 +26,7 @@ func (s *ConfigTestSuite) SetupTest() {
 		RemoteWorkerCount: 5,
 	}
 
-	os.Setenv("PERSONAL_BACKUP_TARGET_DIR", "")
+	os.Setenv("PERSONAL_BACKUP_TARGET_DIRS", "")
 	os.Setenv("PERSONAL_BACKUP_S3_HOST", "")
 	os.Setenv("PERSONAL_BACKUP_S3_ACCESS_KEY", "")
 	os.Setenv("PERSONAL_BACKUP_S3_SECRET_KEY", "")
@@ -38,7 +38,7 @@ func (s *ConfigTestSuite) Test_TakesAllFlags() {
 	c, err := CompileConfig(s.flags)
 
 	s.NoError(err)
-	s.Equal(s.flags.TargetDir, c.TargetDir)
+	s.Equal([]string{s.flags.TargetDirs}, c.TargetDirs)
 	s.Equal(s.flags.S3Host, c.S3Host)
 	s.Equal(s.flags.S3AccessKey, c.S3AccessKey)
 	s.Equal(s.flags.S3SecretKey, c.S3SecretKey)
@@ -47,17 +47,17 @@ func (s *ConfigTestSuite) Test_TakesAllFlags() {
 }
 
 func (s *ConfigTestSuite) Test_TargetDir_TakesEnv() {
-	os.Setenv("PERSONAL_BACKUP_TARGET_DIR", "OS_TARGET_DIR")
+	os.Setenv("PERSONAL_BACKUP_TARGET_DIRS", "OS_TARGET_DIRS")
 
-	s.flags.TargetDir = ""
+	s.flags.TargetDirs = ""
 	c, err := CompileConfig(s.flags)
 
 	s.NoError(err)
-	s.Equal("OS_TARGET_DIR", c.TargetDir)
+	s.Equal([]string{"OS_TARGET_DIRS"}, c.TargetDirs)
 }
 
 func (s *ConfigTestSuite) Test_TargetDir_Missing() {
-	s.flags.TargetDir = ""
+	s.flags.TargetDirs = ""
 
 	_, err := CompileConfig(s.flags)
 

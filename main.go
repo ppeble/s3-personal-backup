@@ -25,14 +25,16 @@ func main() {
 	remoteActionChan := make(chan backup.RemoteAction, 20)
 
 	reportChan := make(chan logger.LogEntry)
-	reportDone := make(chan struct{})
 	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
-	reportGenerator := backup.NewReporter(reportChan, reportDone, reportOut)
+	reportGenerator := backup.NewReporter(reportChan, reportOut)
 	go reportGenerator.Run()
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
 
-	localFileProcessor := backup.NewLocalFileProcessor(config.TargetDir)
+	localFileProcessors := make([]func() (map[string]File, error), len(config.TargetDirs))
+	for targetDir := range config.TargetDirs {
+		localFileProcessors := append(localFileProcessors, backup.NewLocalFileProcessor(targetDir))
+	}
 
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
 		config.S3BucketName,
@@ -55,7 +57,7 @@ func main() {
 	}
 
 	processor := backup.NewProcessor(
-		localFileProcessor.Gather,
+		localFileProcessors,
 		remoteFileProcessor.Gather,
 		logger,
 		&workerWg,
@@ -68,14 +70,13 @@ func main() {
 	}
 
 	workerWg.Wait()
-	reportDone <- struct{}{}
 	reportGenerator.Print()
 }
 
 func processVars() backup.CompiledConfig {
 	flags := backup.Flags{}
 
-	flag.StringVar(&flags.TargetDir, "targetDir", "", "Local directory to back up.")
+	flag.StringVar(&flags.TargetDir, "targetDirs", "", "Local directories  to back up.")
 	flag.StringVar(&flags.S3Host, "s3Host", "", "S3 host.")
 	flag.StringVar(&flags.S3AccessKey, "s3AccessKey", "", "S3 access key.")
 	flag.StringVar(&flags.S3SecretKey, "s3SecretKey", "", "S3 secret key.")

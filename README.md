@@ -25,7 +25,7 @@ This project assumes that you have already set up a user on your preferred S3-co
 
 The `dreamhost_personal_backup` binary requires the following information:
 
-* root directory - specified via the `-targetDir <dir>` flag or by setting the `PERSONAL_BACKUP_TARGET_DIR` env variable
+* backup target directories - specified via the `-targetDir <dir>` flag or by setting the `PERSONAL_BACKUP_TARGET_DIR` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/phil/documents,/home/phil/music,/home/phil/pictures'
 * S3 host - specified via the `s3Host <host>` flag or by setting the `PERSONAL_BACKUP_S3_HOST` env variable
 * S3 access key - specified via the `s3AccessKey <key>` flag or by setting the `PERSONAL_BACKUP_S3_ACCESS_KEY` env variable
 * S3 secret key - specified via the `s3SecretKey <key>` flag or by setting the `PERSONAL_BACKUP_S3_SECRET_KEY` env variable
@@ -42,8 +42,6 @@ In all instances the command line flag will take priority over the environment v
 * Ability to print report of specific directories/files and their status on the remote host. Are they backed up?
 * Ability to pull down files either selectively or as a whole from remote S3 instance to local
 * Progress reporting on transfers
-* Ability to read from config file as well as command line and env vars
-* Ability to leave S3 Bucket blank and have one be generated. It should then be saved in the config so it is consistently referenced.
 
 ## Credits
 
