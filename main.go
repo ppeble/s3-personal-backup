@@ -31,9 +31,10 @@ func main() {
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
 
-	localFileProcessors := make([]func() (map[string]File, error), len(config.TargetDirs))
-	for targetDir := range config.TargetDirs {
-		localFileProcessors := append(localFileProcessors, backup.NewLocalFileProcessor(targetDir))
+	localFileProcessors := make([]func() (map[backup.Filename]backup.File, error), len(config.TargetDirs))
+	for _, targetDir := range config.TargetDirs {
+		p := backup.NewLocalFileProcessor(targetDir)
+		localFileProcessors = append(localFileProcessors, p.Gather)
 	}
 
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
@@ -76,7 +77,7 @@ func main() {
 func processVars() backup.CompiledConfig {
 	flags := backup.Flags{}
 
-	flag.StringVar(&flags.TargetDir, "targetDirs", "", "Local directories  to back up.")
+	flag.StringVar(&flags.TargetDirs, "targetDirs", "", "Local directories  to back up.")
 	flag.StringVar(&flags.S3Host, "s3Host", "", "S3 host.")
 	flag.StringVar(&flags.S3AccessKey, "s3AccessKey", "", "S3 access key.")
 	flag.StringVar(&flags.S3SecretKey, "s3SecretKey", "", "S3 secret key.")
