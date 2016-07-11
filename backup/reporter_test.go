@@ -3,6 +3,7 @@ package backup
 import (
 	"log"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -44,22 +45,27 @@ func (s *ReporterTestSuite) SetupTest() {
 	s.reporter = NewReporter(s.in, s.logger)
 }
 
-//FIXME This seems to flap? Received an 'index out of bounds' error.
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
 	expectedEntry := logger.LogEntry{Message: "test", File: "file1"}
 	s.in <- expectedEntry
+
+	// Seems like it is possible for the 'Run' not getting the value in time
+	time.Sleep(10 * time.Millisecond)
+
 	s.Equal(s.reporter.entries[0], expectedEntry)
 }
 
-//FIXME This seems to be flapping
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
 	s.in <- logger.LogEntry{Message: "test1", File: "file1"}
 	s.in <- logger.LogEntry{Message: "test2", File: "file2"}
 	s.in <- logger.LogEntry{Message: "test3", File: "file3"}
+
+	// Seems like it is possible for the 'Run' not getting the value in time
+	time.Sleep(10 * time.Millisecond)
 
 	s.reporter.Print()
 

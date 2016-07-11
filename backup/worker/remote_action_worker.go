@@ -46,6 +46,8 @@ func (w RemoteActionWorker) Run() {
 }
 
 func (w RemoteActionWorker) push(file backup.File) {
+	defer w.wg.Done()
+
 	err := w.putToRemote(file.Name)
 	if err != nil {
 		w.logger.Error(logger.LogEntry{
@@ -58,11 +60,11 @@ func (w RemoteActionWorker) push(file backup.File) {
 			File:    file.Name,
 		})
 	}
-
-	w.wg.Done()
 }
 
 func (w RemoteActionWorker) remove(file backup.File) {
+	defer w.wg.Done()
+
 	err := w.removeFromRemote(file.Name)
 	if err != nil {
 		entry := logger.LogEntry{
@@ -77,6 +79,4 @@ func (w RemoteActionWorker) remove(file backup.File) {
 		}
 		w.logger.Info(entry)
 	}
-
-	w.wg.Done()
 }

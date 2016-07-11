@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -84,7 +85,6 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_HandlePush() {
 	s.True(s.logInfoCalled)
 }
 
-//FIXME This seems to be a flapping test. Not sure why.
 func (s *RemoteActionWorkerTestSuite) Test_Run_Push_LogsErrorOnFailure() {
 	s.putToRemote = func(f string) error {
 		s.putToRemoteCalled = true
@@ -94,6 +94,9 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_Push_LogsErrorOnFailure() {
 	go s.worker().Run()
 
 	s.input <- backup.RemoteAction{Type: backup.PUSH, File: s.file}
+
+	// Pretty sure that the worker sometimes loses in a race with the checks below
+	time.Sleep(20 * time.Millisecond)
 
 	s.True(s.putToRemoteCalled, "putToRemote should be called")
 	s.False(s.removeFromRemoteCalled, "removeFromRemote should not be called")
@@ -106,12 +109,14 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_HandleRemove() {
 
 	s.input <- backup.RemoteAction{Type: backup.REMOVE, File: s.file}
 
+	// Pretty sure that the worker sometimes loses in a race with the checks below
+	time.Sleep(20 * time.Millisecond)
+
 	s.False(s.putToRemoteCalled)
 	s.True(s.removeFromRemoteCalled)
 	s.True(s.logInfoCalled)
 }
 
-//FIXME Flapping?
 func (s *RemoteActionWorkerTestSuite) Test_Run_Remove_LogsErrorOnFailure() {
 	s.removeFromRemote = func(f string) error {
 		s.removeFromRemoteCalled = true
@@ -122,8 +127,11 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_Remove_LogsErrorOnFailure() {
 
 	s.input <- backup.RemoteAction{Type: backup.REMOVE, File: s.file}
 
-	s.False(s.putToRemoteCalled)
-	s.True(s.removeFromRemoteCalled)
-	s.False(s.logInfoCalled)
-	s.True(s.logErrorCalled)
+	// Pretty sure that the worker sometimes loses in a race with the checks below
+	time.Sleep(20 * time.Millisecond)
+
+	s.False(s.putToRemoteCalled, "putToRemote should not be called")
+	s.True(s.removeFromRemoteCalled, "removeFromRemote should be called")
+	s.False(s.logInfoCalled, "Info should not be called")
+	s.True(s.logErrorCalled, "Error should be called")
 }
