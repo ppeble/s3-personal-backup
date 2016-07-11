@@ -4,7 +4,12 @@ import (
 	"fmt"
 )
 
+type FileData map[Filename]File
 type Filename string
+
+type FileGatherer interface {
+	Gather() (FileData, error)
+}
 
 // These are the only two things that I am
 // verifying for differences at this time. I am thinking

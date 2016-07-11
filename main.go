@@ -31,10 +31,10 @@ func main() {
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
 
-	localFileProcessors := make([]func() (map[backup.Filename]backup.File, error), len(config.TargetDirs))
+	localFileProcessors := make([]backup.FileGatherer, len(config.TargetDirs))
 	for _, targetDir := range config.TargetDirs {
 		p := backup.NewLocalFileProcessor(targetDir)
-		localFileProcessors = append(localFileProcessors, p.Gather)
+		localFileProcessors = append(localFileProcessors, &p)
 	}
 
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
@@ -59,7 +59,7 @@ func main() {
 
 	processor := backup.NewProcessor(
 		localFileProcessors,
-		remoteFileProcessor.Gather,
+		&remoteFileProcessor,
 		logger,
 		&workerWg,
 		remoteActionChan,

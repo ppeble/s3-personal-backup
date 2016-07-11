@@ -5,20 +5,20 @@ import (
 	"path/filepath"
 )
 
-type localFileProcessor struct {
+type LocalFileProcessor struct {
 	targetDir string
-	fileData  map[Filename]File
+	fileData  FileData
 }
 
 //FIXME This should return an error if the target is blank/missing
-func NewLocalFileProcessor(t string) localFileProcessor {
-	return localFileProcessor{
+func NewLocalFileProcessor(t string) LocalFileProcessor {
+	return LocalFileProcessor{
 		targetDir: t,
-		fileData:  make(map[Filename]File, 0),
+		fileData:  make(FileData),
 	}
 }
 
-func (p *localFileProcessor) Gather() (data map[Filename]File, err error) {
+func (p *LocalFileProcessor) Gather() (data FileData, err error) {
 	err = filepath.Walk(p.targetDir, p.processFile)
 	if err != nil {
 		return
@@ -29,7 +29,7 @@ func (p *localFileProcessor) Gather() (data map[Filename]File, err error) {
 	return
 }
 
-func (p *localFileProcessor) processFile(filePath string, fi os.FileInfo, err error) (e error) {
+func (p *LocalFileProcessor) processFile(filePath string, fi os.FileInfo, err error) (e error) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return err
 	}

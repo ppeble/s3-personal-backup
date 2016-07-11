@@ -10,19 +10,6 @@ import (
 	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
-type testLogger struct {
-	logInfo  func(logger.LogEntry)
-	logError func(logger.LogEntry)
-}
-
-func (l testLogger) Info(i logger.LogEntry) {
-	l.logInfo(i)
-}
-
-func (l testLogger) Error(i logger.LogEntry) {
-	l.logError(i)
-}
-
 func TestProcessorTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessorTestSuite))
 }
@@ -33,10 +20,13 @@ type ProcessorTestSuite struct {
 	localGatherCalled  int
 	remoteGatherCalled bool
 
-	localGather  []func() (map[Filename]File, error)
-	remoteGather func() (map[Filename]File, error)
+	localGatherers []FileGatherer
+	remoteGatherer FileGatherer
 
-	localData, remoteData map[Filename]File
+	localGatherFunc  func() (FileData, error)
+	remoteGatherFunc func() (FileData, error)
+
+	localData, remoteData FileData
 
 	logInfoCalled, logErrorCalled bool
 	logger                        testLogger
@@ -49,23 +39,25 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.localGatherCalled = 0
 	s.remoteGatherCalled = false
 
-	s.localData = make(map[Filename]File)
+	s.localData = make(FileData)
 	s.localData["local1"] = newFile("local1", 100)
 
-	s.remoteData = make(map[Filename]File)
+	s.remoteData = make(FileData)
 	s.remoteData["remote1"] = newFile("remote1", 100)
 
-	s.localGather = []func() (map[Filename]File, error){
-		func() (map[Filename]File, error) {
-			s.localGatherCalled++
-			return s.localData, nil
-		},
+	s.localGatherFunc = func() (FileData, error) {
+		s.localGatherCalled++
+		return s.localData, nil
 	}
 
-	s.remoteGather = func() (map[Filename]File, error) {
+	s.localGatherers = make([]FileGatherer, 0)
+	s.localGatherers = append(s.localGatherers, testGatherer{gather: s.localGatherFunc})
+
+	s.remoteGatherFunc = func() (FileData, error) {
 		s.remoteGatherCalled = true
 		return s.remoteData, nil
 	}
+	s.remoteGatherer = testGatherer{gather: s.remoteGatherFunc}
 
 	s.logInfoCalled = false
 	s.logErrorCalled = false
@@ -84,7 +76,7 @@ func (s *ProcessorTestSuite) SetupTest() {
 }
 
 func (s ProcessorTestSuite) processor() processor {
-	return NewProcessor(s.localGather, s.remoteGather, s.logger, s.wg, s.remoteAction)
+	return NewProcessor(s.localGatherers, s.remoteGatherer, s.logger, s.wg, s.remoteAction)
 }
 
 func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_OneLocalGather() {
@@ -108,14 +100,12 @@ func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_MultipleLocalGathers(
 		}
 	}()
 
-	s.localGather = []func() (map[Filename]File, error){
-		func() (map[Filename]File, error) {
-			s.localGatherCalled++
-			return s.localData, nil
+	s.localGatherers = []FileGatherer{
+		testGatherer{
+			gather: s.localGatherFunc,
 		},
-		func() (map[Filename]File, error) {
-			s.localGatherCalled++
-			return s.localData, nil
+		testGatherer{
+			gather: s.localGatherFunc,
 		},
 	}
 
@@ -126,12 +116,13 @@ func (s *ProcessorTestSuite) Test_Process_CallsLocalGather_MultipleLocalGathers(
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	expectedErr := errors.New("asplode!")
-	s.localGather = []func() (map[Filename]File, error){
-		func() (map[Filename]File, error) {
-			s.localGatherCalled++
-			return nil, expectedErr
-		},
+	s.localGatherFunc = func() (FileData, error) {
+		s.localGatherCalled++
+		return nil, expectedErr
 	}
+
+	s.localGatherers = make([]FileGatherer, 0)
+	s.localGatherers = append(s.localGatherers, testGatherer{gather: s.localGatherFunc})
 
 	s.logger.logError = func(i logger.LogEntry) {
 		s.logErrorCalled = true
@@ -139,8 +130,6 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	}
 
 	err := s.processor().Process()
-
-	s.wg.Wait()
 
 	s.Require().Equal(1, s.localGatherCalled)
 	s.Require().Error(err)
@@ -164,10 +153,12 @@ func (s *ProcessorTestSuite) Test_Process_CallsRatherGather() {
 
 func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 	expectedErr := errors.New("asplode!")
-	s.remoteGather = func() (map[Filename]File, error) {
+	s.remoteGatherFunc = func() (FileData, error) {
 		s.remoteGatherCalled = true
 		return nil, expectedErr
 	}
+
+	s.remoteGatherer = testGatherer{gather: s.remoteGatherFunc}
 
 	s.logger.logError = func(i logger.LogEntry) {
 		s.logErrorCalled = true
@@ -176,9 +167,7 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 
 	err := s.processor().Process()
 
-	s.wg.Wait()
-
-	s.Require().Error(err)
+	s.Error(err)
 	s.True(s.remoteGatherCalled)
 	s.Equal(expectedErr, err)
 	s.True(s.logErrorCalled)
@@ -186,8 +175,8 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
-	local := map[Filename]File{"file": newFile("file", 100)}
-	remote := map[Filename]File{"file": newFile("file", 100)}
+	local := FileData{"file": newFile("file", 100)}
+	remote := FileData{"file": newFile("file", 100)}
 
 	s.wg.Add(1)
 	s.processor().processLocalVsRemote(local, remote)
@@ -197,8 +186,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_Equal() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
-	local := map[Filename]File{"file": newFile("file", 100)}
-	remote := map[Filename]File{"file": newFile("file", 101)}
+	local := FileData{"file": newFile("file", 100)}
+	remote := FileData{"file": newFile("file", 101)}
 
 	go func() {
 		action := <-s.remoteAction
@@ -213,8 +202,8 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 }
 
 func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
-	local := map[Filename]File{"file": newFile("file", 100)}
-	remote := map[Filename]File{}
+	local := FileData{"file": newFile("file", 100)}
+	remote := FileData{}
 
 	go func() {
 		action := <-s.remoteAction
@@ -229,16 +218,16 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 }
 
 func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InBoth() {
-	local := map[Filename]File{"file": newFile("file", 100)}
-	remote := map[Filename]File{"file": newFile("file", 100)}
+	local := FileData{"file": newFile("file", 100)}
+	remote := FileData{"file": newFile("file", 100)}
 
 	s.wg.Add(1)
 	s.processor().processRemoteVsLocal(local, remote)
 }
 
 func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
-	local := map[Filename]File{}
-	remote := map[Filename]File{"file": newFile("file", 100)}
+	local := FileData{}
+	remote := FileData{"file": newFile("file", 100)}
 
 	go func() {
 		action := <-s.remoteAction
@@ -253,7 +242,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 }
 
 func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
-	local := map[Filename]File{
+	local := FileData{
 		"file1": newFile("file1", 100),
 		"file2": newFile("file2", 200),
 		"file3": newFile("file3", 300),
@@ -261,7 +250,7 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 		"file5": newFile("file5", 500),
 	}
 
-	remote := map[Filename]File{
+	remote := FileData{
 		"file1": newFile("file1", 100),
 		"file2": newFile("file2", 201),
 		"file3": newFile("file3", 300),
@@ -269,15 +258,18 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 		"file6": newFile("file6", 600),
 	}
 
-	s.localGather = []func() (map[Filename]File, error){
-		func() (map[Filename]File, error) {
-			return local, nil
-		},
+	s.localGatherFunc = func() (FileData, error) {
+		return local, nil
 	}
 
-	s.remoteGather = func() (map[Filename]File, error) {
+	s.localGatherers = make([]FileGatherer, 0)
+	s.localGatherers = append(s.localGatherers, testGatherer{gather: s.localGatherFunc})
+
+	s.remoteGatherFunc = func() (FileData, error) {
 		return remote, nil
 	}
+
+	s.remoteGatherer = testGatherer{gather: s.remoteGatherFunc}
 
 	putCalledCnt := 0
 	removeCalledCnt := 0
@@ -304,7 +296,7 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_SingleLocal() {
 }
 
 func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
-	local1 := map[Filename]File{
+	local1 := FileData{
 		"local1/file1": newFile("local1/file1", 100),
 		"local1/file2": newFile("local1/file2", 200),
 		"local1/file3": newFile("local1/file3", 300),
@@ -312,12 +304,12 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 		"local1/file5": newFile("local1/file5", 500),
 	}
 
-	local2 := map[Filename]File{
+	local2 := FileData{
 		"local2/file1": newFile("local2/file1", 100),
 		"local2/file2": newFile("local2/file2", 200),
 	}
 
-	remote := map[Filename]File{
+	remote := FileData{
 		"local1/file1": newFile("local1/file1", 100),
 		"local1/file2": newFile("local1/file2", 201),
 		"local1/file3": newFile("local1/file3", 300),
@@ -328,18 +320,24 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 		"local2/file3": newFile("local2/file3", 300),
 	}
 
-	s.localGather = []func() (map[Filename]File, error){
-		func() (map[Filename]File, error) {
-			return local1, nil
+	s.localGatherers = []FileGatherer{
+		testGatherer{
+			gather: func() (FileData, error) {
+				return local1, nil
+			},
 		},
-		func() (map[Filename]File, error) {
-			return local2, nil
+		testGatherer{
+			gather: func() (FileData, error) {
+				return local2, nil
+			},
 		},
 	}
 
-	s.remoteGather = func() (map[Filename]File, error) {
+	s.remoteGatherFunc = func() (FileData, error) {
 		return remote, nil
 	}
+
+	s.remoteGatherer = testGatherer{gather: s.remoteGatherFunc}
 
 	putCalledCnt := 0
 	removeCalledCnt := 0
@@ -363,4 +361,25 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 
 	s.Equal(3, putCalledCnt, "putCalledCnt does not match")
 	s.Equal(2, removeCalledCnt, "removeCalledCnt does not match")
+}
+
+type testLogger struct {
+	logInfo  func(logger.LogEntry)
+	logError func(logger.LogEntry)
+}
+
+func (l testLogger) Info(i logger.LogEntry) {
+	l.logInfo(i)
+}
+
+func (l testLogger) Error(i logger.LogEntry) {
+	l.logError(i)
+}
+
+type testGatherer struct {
+	gather func() (FileData, error)
+}
+
+func (g testGatherer) Gather() (FileData, error) {
+	return g.gather()
 }

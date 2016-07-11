@@ -6,9 +6,9 @@ import (
 	minio "github.com/minio/minio-go"
 )
 
-type remoteFileProcessor struct {
+type RemoteFileProcessor struct {
 	bucket   string
-	fileData map[Filename]File
+	fileData FileData
 
 	list   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
 	remove func(string, string) error
@@ -20,21 +20,21 @@ func NewRemoteFileProcessor(
 	l func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo,
 	r func(string, string) error,
 	p func(string, string, string, string) (int64, error),
-) (remoteFileProcessor, error) {
+) (RemoteFileProcessor, error) {
 	if b == "" {
-		return remoteFileProcessor{}, errors.New("'NewRemoteFileProcessor' error: bucket cannot be missing")
+		return RemoteFileProcessor{}, errors.New("'NewRemoteFileProcessor' error: bucket cannot be missing")
 	}
 
-	return remoteFileProcessor{
+	return RemoteFileProcessor{
 		bucket:   b,
 		list:     l,
 		remove:   r,
 		put:      p,
-		fileData: make(map[Filename]File, 0),
+		fileData: make(FileData, 0),
 	}, nil
 }
 
-func (p *remoteFileProcessor) Gather() (data map[Filename]File, err error) {
+func (p *RemoteFileProcessor) Gather() (data FileData, err error) {
 	// Create a done channel to control 'ListObjects' go routine.
 	doneCh := make(chan struct{})
 
@@ -55,12 +55,12 @@ func (p *remoteFileProcessor) Gather() (data map[Filename]File, err error) {
 	return p.fileData, nil
 }
 
-func (p *remoteFileProcessor) Remove(f string) (err error) {
+func (p *RemoteFileProcessor) Remove(f string) (err error) {
 	err = p.remove(p.bucket, f)
 	return
 }
 
-func (p *remoteFileProcessor) Put(f string) (err error) {
+func (p *RemoteFileProcessor) Put(f string) (err error) {
 	if f == "" {
 		err = errors.New("'put' error: target file cannot be missing")
 		return

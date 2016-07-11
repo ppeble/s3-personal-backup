@@ -44,6 +44,7 @@ func (s *ReporterTestSuite) SetupTest() {
 	s.reporter = NewReporter(s.in, s.logger)
 }
 
+//FIXME This seems to flap? Received an 'index out of bounds' error.
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
@@ -52,6 +53,7 @@ func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	s.Equal(s.reporter.entries[0], expectedEntry)
 }
 
+//FIXME This seems to be flapping
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 

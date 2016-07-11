@@ -15,7 +15,7 @@ func TestLocalProcessorTestSuite(t *testing.T) {
 type LocalProcessorTestSuite struct {
 	suite.Suite
 	rootDir   string
-	processor localFileProcessor
+	processor LocalFileProcessor
 }
 
 func (s *LocalProcessorTestSuite) SetupTest() {
@@ -160,7 +160,7 @@ func (s *LocalProcessorTestSuite) createTempFile(directory, prefix string) *os.F
 	return tmpFile
 }
 
-func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data map[Filename]File) {
+func (s *LocalProcessorTestSuite) compare(tmpFile *os.File, data FileData) {
 	fi, err := tmpFile.Stat()
 	if err != nil {
 		s.T().Fatal(err)

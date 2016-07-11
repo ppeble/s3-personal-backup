@@ -8,45 +8,32 @@ import (
 )
 
 type processor struct {
-	localGathers      []func() (map[Filename]File, error)
-	gatherRemoteFiles func() (map[Filename]File, error)
-	logger            logger.BackupLogger
-	wg                *sync.WaitGroup
-	remoteActions     chan<- RemoteAction
+	localGatherers []FileGatherer
+	remoteGatherer FileGatherer
+	logger         logger.BackupLogger
+	wg             *sync.WaitGroup
+	remoteActions  chan<- RemoteAction
 }
 
 func NewProcessor(
-	localGathers []func() (map[Filename]File, error),
-	remoteGather func() (map[Filename]File, error),
+	localGatherers []FileGatherer,
+	remoteGatherer FileGatherer,
 	log logger.BackupLogger,
 	wg *sync.WaitGroup,
 	rac chan<- RemoteAction,
 ) processor {
 	return processor{
-		localGathers:      localGathers,
-		gatherRemoteFiles: remoteGather,
-		logger:            log,
-		wg:                wg,
-		remoteActions:     rac,
+		localGatherers: localGatherers,
+		remoteGatherer: remoteGatherer,
+		logger:         log,
+		wg:             wg,
+		remoteActions:  rac,
 	}
 }
 
 func (p processor) Process() (err error) {
-	localFiles, err := p.runLocalGathers(p.localGathers)
+	localFiles, remoteFiles, err := p.runGatherers()
 	if err != nil {
-		p.logger.Error(logger.LogEntry{
-			Message: fmt.Sprintf("error returned while gathering local files, err: %s", err),
-		})
-
-		return err
-	}
-
-	remoteFiles, err := p.gatherRemoteFiles()
-	if err != nil {
-		p.logger.Error(logger.LogEntry{
-			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", err),
-		})
-
 		return err
 	}
 
@@ -57,11 +44,33 @@ func (p processor) Process() (err error) {
 	return
 }
 
-func (p processor) runLocalGathers(localGathers []func() (map[Filename]File, error)) (map[Filename]File, error) {
+func (p processor) runGatherers() (localFiles, remoteFiles FileData, err error) {
+	localFiles, err = p.runLocalGatherers(p.localGatherers)
+	if err != nil {
+		p.logger.Error(logger.LogEntry{
+			Message: fmt.Sprintf("error returned while gathering local files, err: %s", err),
+		})
+
+		return
+	}
+
+	remoteFiles, err = p.remoteGatherer.Gather()
+	if err != nil {
+		p.logger.Error(logger.LogEntry{
+			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", err),
+		})
+
+		return
+	}
+
+	return
+}
+
+func (p processor) runLocalGatherers(localGatherers []FileGatherer) (FileData, error) {
 	results := make([]map[Filename]File, 0)
 
-	for _, localGather := range localGathers {
-		localFiles, err := localGather()
+	for _, g := range localGatherers {
+		localFiles, err := g.Gather()
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +78,7 @@ func (p processor) runLocalGathers(localGathers []func() (map[Filename]File, err
 		results = append(results, localFiles)
 	}
 
-	combinedResults := make(map[Filename]File)
+	combinedResults := make(FileData)
 	for _, r := range results {
 		for k, v := range r {
 			combinedResults[k] = v
@@ -79,7 +88,7 @@ func (p processor) runLocalGathers(localGathers []func() (map[Filename]File, err
 	return combinedResults, nil
 }
 
-func (p processor) processLocalVsRemote(local, remote map[Filename]File) {
+func (p processor) processLocalVsRemote(local, remote FileData) {
 	defer p.wg.Done()
 
 	for lkey, lfile := range local {
@@ -94,7 +103,7 @@ func (p processor) processLocalVsRemote(local, remote map[Filename]File) {
 	}
 }
 
-func (p processor) processRemoteVsLocal(local, remote map[Filename]File) {
+func (p processor) processRemoteVsLocal(local, remote FileData) {
 	defer p.wg.Done()
 
 	for rkey, rfile := range remote {
