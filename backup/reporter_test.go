@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 type sliceLogger struct {
@@ -29,10 +27,12 @@ type ReporterTestSuite struct {
 
 	sliceLogger *sliceLogger
 
-	in     chan logger.LogEntry
+	in     chan LogEntry
 	logger *log.Logger
 
 	reporter reporter
+
+	messageIterator int
 }
 
 func (s *ReporterTestSuite) SetupTest() {
@@ -40,15 +40,16 @@ func (s *ReporterTestSuite) SetupTest() {
 		messages: make([]string, 0),
 	}
 
-	s.in = make(chan logger.LogEntry)
+	s.in = make(chan LogEntry)
 	s.logger = log.New(s.sliceLogger, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	s.reporter = NewReporter(s.in, s.logger)
+	s.messageIterator = 0
 }
 
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
-	expectedEntry := logger.LogEntry{Message: "test", File: "file1"}
+	expectedEntry := LogEntry{Message: "test", File: "file1"}
 	s.in <- expectedEntry
 
 	// Seems like it is possible for the 'Run' not getting the value in time
@@ -60,19 +61,34 @@ func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
-	s.in <- logger.LogEntry{Message: "test1", File: "file1"}
-	s.in <- logger.LogEntry{Message: "test2", File: "file2"}
-	s.in <- logger.LogEntry{Message: "test3", File: "file3"}
+	s.in <- LogEntry{Message: "test1", File: "file1", ActionType: PUSH}
+	s.in <- LogEntry{Message: "test2", File: "file2", ActionType: PUSH}
+	s.in <- LogEntry{Message: "test3", File: "file3", ActionType: PUSH}
+	s.in <- LogEntry{Message: "test4", File: "file4", ActionType: REMOVE}
 
 	// Seems like it is possible for the 'Run' not getting the value in time
 	time.Sleep(10 * time.Millisecond)
 
 	s.reporter.Print()
 
-	s.Contains(s.sliceLogger.messages[0], "Report")
-	s.Contains(s.sliceLogger.messages[1], "-------------------------------")
-	s.Contains(s.sliceLogger.messages[2], "file: 'file1' - message: 'test1'")
-	s.Contains(s.sliceLogger.messages[3], "file: 'file2' - message: 'test2'")
-	s.Contains(s.sliceLogger.messages[4], "file: 'file3' - message: 'test3'")
-	s.Contains(s.sliceLogger.messages[5], "")
+	s.contains("Backup Report")
+	s.contains("-------------------------------")
+	s.contains("Total run time (in minutes): 0")
+	s.contains("Total files processed: 4")
+	s.contains("Time per file (in seconds):") // The time per file is highly variable
+	s.contains("Files added to remote: 3")
+	s.contains("Files removed from remote: 1")
+	s.contains("")
+	s.contains("File Details")
+	s.contains("-------------------------------")
+	s.contains("file: 'file1' - action: 'push' - message: 'test1'")
+	s.contains("file: 'file2' - action: 'push' - message: 'test2'")
+	s.contains("file: 'file3' - action: 'push' - message: 'test3'")
+	s.contains("file: 'file4' - action: 'remove' - message: 'test4'")
+	s.contains("")
+}
+
+func (s *ReporterTestSuite) contains(expected string) {
+	s.Contains(s.sliceLogger.messages[s.messageIterator], expected)
+	s.messageIterator++
 }

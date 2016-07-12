@@ -5,13 +5,12 @@ import (
 	"sync"
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
-	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 type RemoteActionWorker struct {
 	wg     *sync.WaitGroup
 	in     <-chan backup.RemoteAction
-	logger logger.BackupLogger
+	logger backupLogger
 
 	putToRemote      func(string) error
 	removeFromRemote func(string) error
@@ -21,7 +20,7 @@ func NewRemoteActionWorker(
 	putToRemote, removeFromRemote func(string) error,
 	wg *sync.WaitGroup,
 	in <-chan backup.RemoteAction,
-	log logger.BackupLogger,
+	log backupLogger,
 ) RemoteActionWorker {
 	return RemoteActionWorker{
 		putToRemote:      putToRemote,
@@ -50,12 +49,12 @@ func (w RemoteActionWorker) push(file backup.File) {
 
 	err := w.putToRemote(file.Name)
 	if err != nil {
-		w.logger.Error(logger.LogEntry{
+		w.logger.Error(backup.LogEntry{
 			Message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
 			File:    file.Name,
 		})
 	} else {
-		w.logger.Info(logger.LogEntry{
+		w.logger.Info(backup.LogEntry{
 			Message: fmt.Sprintf("%s pushed to remote", file),
 			File:    file.Name,
 		})
@@ -67,13 +66,13 @@ func (w RemoteActionWorker) remove(file backup.File) {
 
 	err := w.removeFromRemote(file.Name)
 	if err != nil {
-		entry := logger.LogEntry{
+		entry := backup.LogEntry{
 			Message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
 			File:    file.Name,
 		}
 		w.logger.Error(entry)
 	} else {
-		entry := logger.LogEntry{
+		entry := backup.LogEntry{
 			Message: fmt.Sprintf("%s not found locally, removing from remote", file),
 			File:    file.Name,
 		}

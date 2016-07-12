@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup"
 )
 
 type sliceLogger struct {
@@ -26,18 +28,18 @@ type LoggerTestSuite struct {
 
 	sliceLogger *sliceLogger
 
-	report    chan LogEntry
-	reportMsg LogEntry
+	report    chan backup.LogEntry
+	reportMsg backup.LogEntry
 	wg        *sync.WaitGroup
 
-	logger BackupLogger
+	logger backupLogger
 }
 
 func (s *LoggerTestSuite) SetupTest() {
 	s.sliceLogger = &sliceLogger{
 		messages: make([]string, 0),
 	}
-	s.report = make(chan LogEntry)
+	s.report = make(chan backup.LogEntry)
 	s.wg = &sync.WaitGroup{}
 	s.logger = NewLogger(s.sliceLogger, s.report, s.wg)
 
@@ -49,7 +51,7 @@ func (s *LoggerTestSuite) SetupTest() {
 }
 
 func (s *LoggerTestSuite) Test_Info_LogsToInfoLogger() {
-	entry := LogEntry{Message: "test", File: "testFile"}
+	entry := backup.LogEntry{Message: "test", File: "testFile"}
 	s.logger.Info(entry)
 
 	s.wg.Wait()
@@ -59,7 +61,7 @@ func (s *LoggerTestSuite) Test_Info_LogsToInfoLogger() {
 }
 
 func (s *LoggerTestSuite) Test_Info_SendsEntryToReportChannel() {
-	entry := LogEntry{Message: "test", File: "testFile"}
+	entry := backup.LogEntry{Message: "test", File: "testFile"}
 	s.logger.Info(entry)
 
 	s.wg.Wait()
@@ -67,7 +69,7 @@ func (s *LoggerTestSuite) Test_Info_SendsEntryToReportChannel() {
 }
 
 func (s *LoggerTestSuite) Test_Error_LogsToErrorLogger() {
-	entry := LogEntry{Message: "test", File: "testFile"}
+	entry := backup.LogEntry{Message: "test", File: "testFile"}
 	s.logger.Error(entry)
 
 	s.wg.Wait()
@@ -77,7 +79,7 @@ func (s *LoggerTestSuite) Test_Error_LogsToErrorLogger() {
 }
 
 func (s *LoggerTestSuite) Test_Error_SendsEntryToReportChannel() {
-	entry := LogEntry{Message: "test", File: "testFile"}
+	entry := backup.LogEntry{Message: "test", File: "testFile"}
 	s.logger.Error(entry)
 
 	s.wg.Wait()

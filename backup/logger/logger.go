@@ -4,6 +4,8 @@ import (
 	"io"
 	"log"
 	"sync"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup"
 )
 
 const (
@@ -11,12 +13,7 @@ const (
 	ERROR = "ERROR"
 )
 
-type BackupLogger interface {
-	Info(LogEntry)
-	Error(LogEntry)
-}
-
-func NewLogger(out io.Writer, report chan<- LogEntry, wg *sync.WaitGroup) BackupLogger {
+func NewLogger(out io.Writer, report chan<- backup.LogEntry, wg *sync.WaitGroup) backupLogger {
 	return backupLogger{
 		infoLog:  log.New(out, INFO+": ", log.Ldate|log.Ltime|log.LUTC),
 		errorLog: log.New(out, ERROR+": ", log.Ldate|log.Ltime|log.LUTC),
@@ -28,21 +25,23 @@ func NewLogger(out io.Writer, report chan<- LogEntry, wg *sync.WaitGroup) Backup
 type backupLogger struct {
 	infoLog  *log.Logger
 	errorLog *log.Logger
-	report   chan<- LogEntry
+	report   chan<- backup.LogEntry
 	wg       *sync.WaitGroup
 }
 
-func (l backupLogger) Info(i LogEntry) {
+//FIXME Can't we just print the log entry? Why not? Why do it again here?
+func (l backupLogger) Info(i backup.LogEntry) {
 	l.infoLog.Println("file: '" + i.File + "' - message: '" + i.Message + "'")
 	l.sendToReporter(i)
 }
 
-func (l backupLogger) Error(i LogEntry) {
+//FIXME Can't we just print the log entry? Why not? Why do it again here?
+func (l backupLogger) Error(i backup.LogEntry) {
 	l.errorLog.Println("file: '" + i.File + "' - message: '" + i.Message + "'")
 	l.sendToReporter(i)
 }
 
-func (l backupLogger) sendToReporter(i LogEntry) {
+func (l backupLogger) sendToReporter(i backup.LogEntry) {
 	l.wg.Add(1)
 	go func() {
 		l.report <- i

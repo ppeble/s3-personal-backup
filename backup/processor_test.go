@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 func TestProcessorTestSuite(t *testing.T) {
@@ -63,10 +61,10 @@ func (s *ProcessorTestSuite) SetupTest() {
 	s.logErrorCalled = false
 
 	s.logger = testLogger{
-		logInfo: func(i logger.LogEntry) {
+		logInfo: func(i LogEntry) {
 			s.logInfoCalled = true
 		},
-		logError: func(i logger.LogEntry) {
+		logError: func(i LogEntry) {
 			s.logErrorCalled = true
 		},
 	}
@@ -124,9 +122,9 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromLocalGather() {
 	s.localGatherers = make([]FileGatherer, 0)
 	s.localGatherers = append(s.localGatherers, testGatherer{gather: s.localGatherFunc})
 
-	s.logger.logError = func(i logger.LogEntry) {
+	s.logger.logError = func(i LogEntry) {
 		s.logErrorCalled = true
-		s.Equal(logger.LogEntry{Message: "error returned while gathering local files, err: asplode!"}, i)
+		s.Equal(LogEntry{Message: "error returned while gathering local files, err: asplode!"}, i)
 	}
 
 	err := s.processor().Process()
@@ -160,9 +158,9 @@ func (s *ProcessorTestSuite) Test_Process_ReturnsErrorFromRemoteGather() {
 
 	s.remoteGatherer = testGatherer{gather: s.remoteGatherFunc}
 
-	s.logger.logError = func(i logger.LogEntry) {
+	s.logger.logError = func(i LogEntry) {
 		s.logErrorCalled = true
-		s.Equal(logger.LogEntry{Message: "error returned while gathering remote files, err: asplode!"}, i)
+		s.Equal(LogEntry{Message: "error returned while gathering remote files, err: asplode!"}, i)
 	}
 
 	err := s.processor().Process()
@@ -364,15 +362,15 @@ func (s *ProcessorTestSuite) Test_Process_MultipleDifferences_MultipleLocal() {
 }
 
 type testLogger struct {
-	logInfo  func(logger.LogEntry)
-	logError func(logger.LogEntry)
+	logInfo  func(LogEntry)
+	logError func(LogEntry)
 }
 
-func (l testLogger) Info(i logger.LogEntry) {
+func (l testLogger) Info(i LogEntry) {
 	l.logInfo(i)
 }
 
-func (l testLogger) Error(i logger.LogEntry) {
+func (l testLogger) Error(i LogEntry) {
 	l.logError(i)
 }
 

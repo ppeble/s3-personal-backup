@@ -3,14 +3,12 @@ package backup
 import (
 	"fmt"
 	"sync"
-
-	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
 )
 
 type processor struct {
 	localGatherers []FileGatherer
 	remoteGatherer FileGatherer
-	logger         logger.BackupLogger
+	logger         backupLogger
 	wg             *sync.WaitGroup
 	remoteActions  chan<- RemoteAction
 }
@@ -18,7 +16,7 @@ type processor struct {
 func NewProcessor(
 	localGatherers []FileGatherer,
 	remoteGatherer FileGatherer,
-	log logger.BackupLogger,
+	log backupLogger,
 	wg *sync.WaitGroup,
 	rac chan<- RemoteAction,
 ) processor {
@@ -47,7 +45,7 @@ func (p processor) Process() (err error) {
 func (p processor) runGatherers() (localFiles, remoteFiles FileData, err error) {
 	localFiles, err = p.runLocalGatherers(p.localGatherers)
 	if err != nil {
-		p.logger.Error(logger.LogEntry{
+		p.logger.Error(LogEntry{
 			Message: fmt.Sprintf("error returned while gathering local files, err: %s", err),
 		})
 
@@ -56,7 +54,7 @@ func (p processor) runGatherers() (localFiles, remoteFiles FileData, err error) 
 
 	remoteFiles, err = p.remoteGatherer.Gather()
 	if err != nil {
-		p.logger.Error(logger.LogEntry{
+		p.logger.Error(LogEntry{
 			Message: fmt.Sprintf("error returned while gathering remote files, err: %s", err),
 		})
 
