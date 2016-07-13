@@ -25,15 +25,15 @@ This project assumes that you have already set up a user on your preferred S3-co
 
 The `dreamhost_personal_backup` binary requires the following information:
 
-* backup target directories - specified via the `-targetDir <dir>` flag or by setting the `PERSONAL_BACKUP_TARGET_DIR` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/phil/documents,/home/phil/music,/home/phil/pictures'
-* S3 host - specified via the `s3Host <host>` flag or by setting the `PERSONAL_BACKUP_S3_HOST` env variable
-* S3 access key - specified via the `s3AccessKey <key>` flag or by setting the `PERSONAL_BACKUP_S3_ACCESS_KEY` env variable
-* S3 secret key - specified via the `s3SecretKey <key>` flag or by setting the `PERSONAL_BACKUP_S3_SECRET_KEY` env variable
-* S3 bucket name - specified via the `-s3BucketName` flag or the `PERSONAL_BACKUP_S3_BUCKET_NAME` env variable
+* backup target directories - specified via the `--targetDirs <dir>` flag or by setting the `PERSONAL_BACKUP_TARGETDIRS` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/phil/documents,/home/phil/music,/home/phil/pictures'
+* S3 host - specified via the `--s3Host <host>` flag or by setting the `PERSONAL_BACKUP_S3HOST` env variable
+* S3 access key - specified via the `--s3AccessKey <key>` flag or by setting the `PERSONAL_BACKUP_S3ACCESSKEY` env variable
+* S3 secret key - specified via the `--s3SecretKey <key>` flag or by setting the `PERSONAL_BACKUP_S3SECRETKEY` env variable
+* S3 bucket name - specified via the `--s3BucketName <name>` flag or the `PERSONAL_BACKUP_S3BUCKETNAME` env variable
 
 In addition, there are optional fields:
 
-* remote worker count - number of workers to run in parallel to process actions on the remote host. Used currently to (primitively) limit bandwidth usage. Fewer workers means fewer simultaneous actions (like uploading) run against the S3 host. Specified via the `-remoteWorkerCount` flag or the `PERSONAL_BACKUP_REMOTE_WORKER_COUNT` env variable
+* remote worker count - number of workers to run in parallel to process actions on the remote host. Used currently to (primitively) limit bandwidth usage. Fewer workers means fewer simultaneous actions (like uploading) run against the S3 host. Specified via the `--remoteWorkerCount <count>` flag or the `PERSONAL_BACKUP_REMOTEWORKERCOUNT` env variable
 
 In all instances the command line flag will take priority over the environment variable.
 

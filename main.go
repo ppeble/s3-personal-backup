@@ -1,12 +1,14 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/minio/minio-go"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
 	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
@@ -14,9 +16,14 @@ import (
 )
 
 func main() {
-	config := processVars()
+	processVars()
 
-	s3Client, err := minio.NewV2(config.S3Host, config.S3AccessKey, config.S3SecretKey, false)
+	s3Client, err := minio.NewV2(
+		viper.GetString("s3Host"),
+		viper.GetString("s3AccessKey"),
+		viper.GetString("s3SecretKey"),
+		false,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -24,21 +31,22 @@ func main() {
 	var workerWg sync.WaitGroup
 	remoteActionChan := make(chan backup.RemoteAction, 20)
 
-	reportChan := make(chan logger.LogEntry)
+	reportChan := make(chan backup.LogEntry)
 	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	reportGenerator := backup.NewReporter(reportChan, reportOut)
 	go reportGenerator.Run()
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
 
-	localFileProcessors := make([]backup.FileGatherer, len(config.TargetDirs))
-	for _, targetDir := range config.TargetDirs {
+	targetDirs := strings.Split(viper.GetString("targetDirs"), ",")
+	localFileProcessors := make([]backup.FileGatherer, len(targetDirs))
+	for i, targetDir := range targetDirs {
 		p := backup.NewLocalFileProcessor(targetDir)
-		localFileProcessors = append(localFileProcessors, &p)
+		localFileProcessors[i] = &p
 	}
 
 	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
-		config.S3BucketName,
+		viper.GetString("s3BucketName"),
 		s3Client.ListObjects,
 		s3Client.RemoveObject,
 		s3Client.FPutObject,
@@ -47,7 +55,7 @@ func main() {
 		panic(err)
 	}
 
-	for i := 0; i < config.RemoteWorkerCount; i++ {
+	for i := 0; i < viper.GetInt("remoteWorkerCount"); i++ {
 		go worker.NewRemoteActionWorker(
 			remoteFileProcessor.Put,
 			remoteFileProcessor.Remove,
@@ -74,21 +82,30 @@ func main() {
 	reportGenerator.Print()
 }
 
-func processVars() backup.CompiledConfig {
-	flags := backup.Flags{}
-
-	flag.StringVar(&flags.TargetDirs, "targetDirs", "", "Local directories  to back up.")
-	flag.StringVar(&flags.S3Host, "s3Host", "", "S3 host.")
-	flag.StringVar(&flags.S3AccessKey, "s3AccessKey", "", "S3 access key.")
-	flag.StringVar(&flags.S3SecretKey, "s3SecretKey", "", "S3 secret key.")
-	flag.StringVar(&flags.S3BucketName, "s3BucketName", "", "S3 Bucket Name.")
-	flag.IntVar(&flags.RemoteWorkerCount, "remoteWorkerCount", 0, "Numer of workers performing actions against S3 host.")
+func processVars() {
+	flag.String("targetDirs", "", "Local directories  to back up.")
+	flag.String("s3Host", "", "S3 host.")
+	flag.String("s3AccessKey", "", "S3 access key.")
+	flag.String("s3SecretKey", "", "S3 secret key.")
+	flag.String("s3BucketName", "", "S3 Bucket Name.")
+	flag.Int("remoteWorkerCount", 0, "Number of workers performing actions against S3 host.")
 	flag.Parse()
 
-	compiledConfig, err := backup.CompileConfig(flags)
-	if err != nil {
-		panic(err)
-	}
+	viper.BindPFlag("targetDirs", flag.CommandLine.Lookup("targetDirs"))
+	viper.BindPFlag("s3Host", flag.CommandLine.Lookup("s3Host"))
+	viper.BindPFlag("s3AccessKey", flag.CommandLine.Lookup("s3AccessKey"))
+	viper.BindPFlag("s3SecretKey", flag.CommandLine.Lookup("s3SecretKey"))
+	viper.BindPFlag("s3BucketName", flag.CommandLine.Lookup("s3BucketName"))
+	viper.BindPFlag("remoteWorkerCount", flag.CommandLine.Lookup("remoteWorkerCount"))
 
-	return compiledConfig
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("PERSONAL_BACKUP")
+	viper.BindEnv("targetDirs")
+	viper.BindEnv("s3Host")
+	viper.BindEnv("s3AccessKey")
+	viper.BindEnv("s3SecretKey")
+	viper.BindEnv("s3BucketName")
+	viper.BindEnv("remoteWorkerCount")
+
+	viper.SetDefault("remoteWorkerCount", 5)
 }
