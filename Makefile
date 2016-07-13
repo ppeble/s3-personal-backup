@@ -1,6 +1,6 @@
 default: test
 
-PACKAGES:="./backup ./backup/worker ./backup/logger"
+PACKAGES:="./backup ./backup/worker ./backup/logger ./backup/reporter"
 
 test:
 	@go list -f '{{.Dir}}/test.cov {{.ImportPath}}' "$(PACKAGES)"  \
