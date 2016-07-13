@@ -79,6 +79,9 @@ func (s *RemoteActionWorkerTestSuite) Test_Run_HandlePush() {
 
 	s.input <- backup.RemoteAction{Type: backup.PUSH, File: s.file}
 
+	// I think that the 'Run' doesn't finish before the checks take places, hence the sleep
+	time.Sleep(10 * time.Millisecond)
+
 	s.True(s.putToRemoteCalled)
 	s.False(s.removeFromRemoteCalled)
 	s.True(s.logInfoCalled)
