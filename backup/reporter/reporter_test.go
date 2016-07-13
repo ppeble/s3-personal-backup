@@ -1,4 +1,4 @@
-package backup
+package reporter
 
 import (
 	"log"
@@ -6,17 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/ptrimble/dreamhost-personal-backup/backup"
 )
-
-type sliceLogger struct {
-	messages []string
-}
-
-func (l *sliceLogger) Write(b []byte) (n int, err error) {
-	msg := string(b[:])
-	l.messages = append(l.messages, msg)
-	return len(msg), nil
-}
 
 func TestReporterTestSuite(t *testing.T) {
 	suite.Run(t, new(ReporterTestSuite))
@@ -27,7 +19,7 @@ type ReporterTestSuite struct {
 
 	sliceLogger *sliceLogger
 
-	in     chan LogEntry
+	in     chan backup.LogEntry
 	logger *log.Logger
 
 	reporter reporter
@@ -40,7 +32,7 @@ func (s *ReporterTestSuite) SetupTest() {
 		messages: make([]string, 0),
 	}
 
-	s.in = make(chan LogEntry)
+	s.in = make(chan backup.LogEntry)
 	s.logger = log.New(s.sliceLogger, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
 	s.reporter = NewReporter(s.in, s.logger)
 	s.messageIterator = 0
@@ -49,7 +41,7 @@ func (s *ReporterTestSuite) SetupTest() {
 func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
-	expectedEntry := LogEntry{Message: "test", File: "file1"}
+	expectedEntry := backup.LogEntry{Message: "test", File: "file1"}
 	s.in <- expectedEntry
 
 	// Seems like it is possible for the 'Run' not getting the value in time
@@ -61,10 +53,10 @@ func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
-	s.in <- LogEntry{Message: "test1", File: "file1", ActionType: PUSH}
-	s.in <- LogEntry{Message: "test2", File: "file2", ActionType: PUSH}
-	s.in <- LogEntry{Message: "test3", File: "file3", ActionType: PUSH}
-	s.in <- LogEntry{Message: "test4", File: "file4", ActionType: REMOVE}
+	s.in <- backup.LogEntry{Message: "test1", File: "file1", ActionType: backup.PUSH}
+	s.in <- backup.LogEntry{Message: "test2", File: "file2", ActionType: backup.PUSH}
+	s.in <- backup.LogEntry{Message: "test3", File: "file3", ActionType: backup.PUSH}
+	s.in <- backup.LogEntry{Message: "test4", File: "file4", ActionType: backup.REMOVE}
 
 	// Seems like it is possible for the 'Run' not getting the value in time
 	time.Sleep(10 * time.Millisecond)

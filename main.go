@@ -12,6 +12,7 @@ import (
 
 	"github.com/ptrimble/dreamhost-personal-backup/backup"
 	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
+	"github.com/ptrimble/dreamhost-personal-backup/backup/reporter"
 	"github.com/ptrimble/dreamhost-personal-backup/backup/worker"
 )
 
@@ -33,7 +34,16 @@ func main() {
 
 	reportChan := make(chan backup.LogEntry)
 	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
-	reportGenerator := backup.NewReporter(reportChan, reportOut)
+
+	var reportGenerator backup.Reporter
+	if viper.GetBool("dryRun") {
+		r := reporter.NewDryRunReporter(reportChan, reportOut)
+		reportGenerator = &r
+	} else {
+		r := reporter.NewReporter(reportChan, reportOut)
+		reportGenerator = &r
+	}
+
 	go reportGenerator.Run()
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
@@ -56,13 +66,21 @@ func main() {
 	}
 
 	for i := 0; i < viper.GetInt("remoteWorkerCount"); i++ {
-		go worker.NewRemoteActionWorker(
-			remoteFileProcessor.Put,
-			remoteFileProcessor.Remove,
-			&workerWg,
-			remoteActionChan,
-			logger,
-		).Run()
+		if viper.GetBool("dryRun") {
+			go worker.NewDryRunActionWorker(
+				&workerWg,
+				remoteActionChan,
+				reportChan,
+			).Run()
+		} else {
+			go worker.NewRemoteActionWorker(
+				remoteFileProcessor.Put,
+				remoteFileProcessor.Remove,
+				&workerWg,
+				remoteActionChan,
+				logger,
+			).Run()
+		}
 	}
 
 	processor := backup.NewProcessor(
@@ -88,7 +106,8 @@ func processVars() {
 	flag.String("s3AccessKey", "", "S3 access key.")
 	flag.String("s3SecretKey", "", "S3 secret key.")
 	flag.String("s3BucketName", "", "S3 Bucket Name.")
-	flag.Int("remoteWorkerCount", 0, "Number of workers performing actions against S3 host.")
+	flag.Int("remoteWorkerCount", 5, "Number of workers performing actions against S3 host.")
+	flag.Bool("dryRun", false, "Flag to indicate that this should be a dry run.")
 	flag.Parse()
 
 	viper.BindPFlag("targetDirs", flag.CommandLine.Lookup("targetDirs"))
@@ -97,6 +116,7 @@ func processVars() {
 	viper.BindPFlag("s3SecretKey", flag.CommandLine.Lookup("s3SecretKey"))
 	viper.BindPFlag("s3BucketName", flag.CommandLine.Lookup("s3BucketName"))
 	viper.BindPFlag("remoteWorkerCount", flag.CommandLine.Lookup("remoteWorkerCount"))
+	viper.BindPFlag("dryRun", flag.CommandLine.Lookup("dryRun"))
 
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("PERSONAL_BACKUP")
