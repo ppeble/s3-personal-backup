@@ -1,6 +1,6 @@
 default: test
 
-PACKAGES:="./backup ./backup/worker ./backup/logger ./backup/reporter"
+PACKAGES:="./. ./worker ./logger ./reporter"
 
 test:
 	@go list -f '{{.Dir}}/test.cov {{.ImportPath}}' "$(PACKAGES)"  \
@@ -17,7 +17,7 @@ run: build
 	./dreamhost-personal-backup
 
 build: clean
-	go build -o build/dreamhost-personal-backup ./
+	go build -o build/dreamhost-personal-backup ./cmd
 
 clean:
 	rm -rf build

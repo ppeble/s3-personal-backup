@@ -3,7 +3,7 @@ package backup
 import (
 	"errors"
 
-	minio "github.com/minio/minio-go"
+	"github.com/minio/minio-go"
 )
 
 type RemoteFileProcessor struct {

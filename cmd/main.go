@@ -10,10 +10,10 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/ptrimble/dreamhost-personal-backup/backup"
-	"github.com/ptrimble/dreamhost-personal-backup/backup/logger"
-	"github.com/ptrimble/dreamhost-personal-backup/backup/reporter"
-	"github.com/ptrimble/dreamhost-personal-backup/backup/worker"
+	"github.com/ptrimble/dreamhost-personal-backup"
+	"github.com/ptrimble/dreamhost-personal-backup/logger"
+	"github.com/ptrimble/dreamhost-personal-backup/reporter"
+	"github.com/ptrimble/dreamhost-personal-backup/worker"
 )
 
 func main() {
