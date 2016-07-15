@@ -53,7 +53,7 @@ type Client struct {
 		appName    string
 		appVersion string
 	}
-	endpointURL *url.URL
+	endpointURL string
 
 	// Needs allocation.
 	httpClient     *http.Client
@@ -84,8 +84,8 @@ const (
 
 // NewV2 - instantiate minio client with Amazon S3 signature version
 // '2' compatibility.
-func NewV2(endpoint string, accessKeyID, secretAccessKey string, insecure bool) (*Client, error) {
-	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, insecure)
+func NewV2(endpoint string, accessKeyID, secretAccessKey string, secure bool) (*Client, error) {
+	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +96,8 @@ func NewV2(endpoint string, accessKeyID, secretAccessKey string, insecure bool) 
 
 // NewV4 - instantiate minio client with Amazon S3 signature version
 // '4' compatibility.
-func NewV4(endpoint string, accessKeyID, secretAccessKey string, insecure bool) (*Client, error) {
-	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, insecure)
+func NewV4(endpoint string, accessKeyID, secretAccessKey string, secure bool) (*Client, error) {
+	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
 		return nil, err
 	}
@@ -108,8 +108,8 @@ func NewV4(endpoint string, accessKeyID, secretAccessKey string, insecure bool) 
 
 // New - instantiate minio client Client, adds automatic verification
 // of signature.
-func New(endpoint string, accessKeyID, secretAccessKey string, insecure bool) (*Client, error) {
-	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, insecure)
+func New(endpoint string, accessKeyID, secretAccessKey string, secure bool) (*Client, error) {
+	clnt, err := privateNew(endpoint, accessKeyID, secretAccessKey, secure)
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +148,9 @@ func (r *lockedRandSource) Seed(seed int64) {
 	r.lk.Unlock()
 }
 
-func privateNew(endpoint, accessKeyID, secretAccessKey string, insecure bool) (*Client, error) {
+func privateNew(endpoint, accessKeyID, secretAccessKey string, secure bool) (*Client, error) {
 	// construct endpoint.
-	endpointURL, err := getEndpointURL(endpoint, insecure)
+	endpointURL, err := getEndpointURL(endpoint, secure)
 	if err != nil {
 		return nil, err
 	}
@@ -164,14 +164,10 @@ func privateNew(endpoint, accessKeyID, secretAccessKey string, insecure bool) (*
 	}
 
 	// Save endpoint URL, user agent for future uses.
-	clnt.endpointURL = endpointURL
+	clnt.endpointURL = endpointURL.String()
 
 	// Instantiate http client and bucket location cache.
 	clnt.httpClient = &http.Client{
-		// Setting a sensible time out of 2minutes to wait for response
-		// headers. Request is pro-actively cancelled after 2minutes
-		// if no response was received from server.
-		Timeout:   2 * time.Minute,
 		Transport: http.DefaultTransport,
 	}
 
@@ -217,13 +213,6 @@ func (c *Client) SetCustomTransport(customHTTPTransport http.RoundTripper) {
 	//
 	if c.httpClient != nil {
 		c.httpClient.Transport = customHTTPTransport
-	}
-}
-
-// SetClientTimeout - set http client timeout.
-func (c *Client) SetClientTimeout(timeout time.Duration) {
-	if c.httpClient != nil {
-		c.httpClient.Timeout = timeout
 	}
 }
 
@@ -568,10 +557,15 @@ func (c Client) newRequest(method string, metadata requestMetadata) (req *http.R
 		req.Body = ioutil.NopCloser(metadata.contentBody)
 	}
 
-	// set 'Expect' header for the request.
-	req.Header.Set("Expect", "100-continue")
+	// FIXEM: Enable this when Google Cloud Storage properly supports 100-continue.
+	// Skip setting 'expect' header for Google Cloud Storage, there
+	// are some known issues - https://github.com/restic/restic/issues/520
+	if !isGoogleEndpoint(c.endpointURL) {
+		// Set 'Expect' header for the request.
+		req.Header.Set("Expect", "100-continue")
+	}
 
-	// set 'User-Agent' header for the request.
+	// Set 'User-Agent' header for the request.
 	c.setUserAgent(req)
 
 	// Set all headers.
@@ -627,14 +621,18 @@ func (c Client) setUserAgent(req *http.Request) {
 // makeTargetURL make a new target url.
 func (c Client) makeTargetURL(bucketName, objectName, bucketLocation string, queryValues url.Values) (*url.URL, error) {
 	// Save host.
-	host := c.endpointURL.Host
+	url, err := url.Parse(c.endpointURL)
+	if err != nil {
+		return nil, err
+	}
+	host := url.Host
 	// For Amazon S3 endpoint, try to fetch location based endpoint.
 	if isAmazonEndpoint(c.endpointURL) {
 		// Fetch new host based on the bucket location.
 		host = getS3Endpoint(bucketLocation)
 	}
 	// Save scheme.
-	scheme := c.endpointURL.Scheme
+	scheme := url.Scheme
 
 	urlStr := scheme + "://" + host + "/"
 	// Make URL only if bucketName is available, otherwise use the

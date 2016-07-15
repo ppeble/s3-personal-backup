@@ -59,11 +59,18 @@ func (c Client) GetObject(bucketName, objectName string) (*Object, error) {
 			select {
 			// When the done channel is closed exit our routine.
 			case <-doneCh:
+				// Close the http response body before returning.
+				// This ends the connection with the server.
+				httpReader.Close()
 				return
 			// Request message.
 			case req := <-reqCh:
 				// Offset changes fetch the new object at an Offset.
 				if req.DidOffsetChange {
+					if httpReader != nil {
+						// Close previously opened http reader.
+						httpReader.Close()
+					}
 					// Read from offset.
 					httpReader, _, err = c.getObject(bucketName, objectName, req.Offset, 0)
 					if err != nil {

@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 )
 
 /// Bucket operations
@@ -87,7 +88,10 @@ func (c Client) makeBucketRequest(bucketName string, location string) (*http.Req
 	// is the preferred method here. The final location of the
 	// 'bucket' is provided through XML LocationConstraint data with
 	// the request.
-	targetURL := *c.endpointURL
+	targetURL, err := url.Parse(c.endpointURL)
+	if err != nil {
+		return nil, err
+	}
 	targetURL.Path = "/" + bucketName + "/"
 
 	// get a new HTTP request for the method.
@@ -162,18 +166,35 @@ func (c Client) SetBucketPolicy(bucketName string, objectPrefix string, bucketPo
 	}
 	// For bucket policy set to 'none' we need to remove the policy.
 	if bucketPolicy == BucketPolicyNone && policy.Statements == nil {
-		// No policies to set, return success.
-		return nil
+		// No policy exists on the given prefix so return with ErrNoSuchBucketPolicy.
+		return ErrNoSuchBucketPolicy(fmt.Sprintf("No policy exists on %s/%s", bucketName, objectPrefix))
 	}
 	// Remove any previous policies at this path.
-	policy.Statements = removeBucketPolicyStatement(policy.Statements, bucketName, objectPrefix)
+	statements := removeBucketPolicyStatement(policy.Statements, bucketName, objectPrefix)
 
 	// generating []Statement for the given bucketPolicy.
-	statements, err := generatePolicyStatement(bucketPolicy, bucketName, objectPrefix)
+	generatedStatements, err := generatePolicyStatement(bucketPolicy, bucketName, objectPrefix)
 	if err != nil {
 		return err
 	}
-	policy.Statements = append(policy.Statements, statements...)
+	statements = append(statements, generatedStatements...)
+
+	// No change in the statements indicates either an attempt of setting 'none'
+	// on a prefix which doesn't have a pre-existing policy, or setting a policy
+	// on a prefix which already has the same policy.
+	if reflect.DeepEqual(policy.Statements, statements) {
+		// If policy being set is 'none' return an error, otherwise return nil to
+		// prevent the unnecessary request from being sent
+		var err error
+		if bucketPolicy == BucketPolicyNone {
+			err = ErrNoSuchBucketPolicy(fmt.Sprintf("No policy exists on %s/%s", bucketName, objectPrefix))
+		} else {
+			err = nil
+		}
+		return err
+	}
+
+	policy.Statements = statements
 	// Save the updated policies.
 	return c.putBucketPolicy(bucketName, policy)
 }

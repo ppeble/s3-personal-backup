@@ -19,11 +19,11 @@ import (
 func main() {
 	processVars()
 
-	s3Client, err := minio.NewV2(
+	s3Client, err := minio.New(
 		viper.GetString("s3Host"),
 		viper.GetString("s3AccessKey"),
 		viper.GetString("s3SecretKey"),
-		false,
+		(viper.GetBool("s3Insecure") == false),
 	)
 	if err != nil {
 		panic(err)
@@ -102,6 +102,7 @@ func main() {
 
 func processVars() {
 	flag.String("targetDirs", "", "Local directories  to back up.")
+	flag.Bool("s3Insecure", false, "Use http for s3 connection. Default: false")
 	flag.String("s3Host", "", "S3 host.")
 	flag.String("s3AccessKey", "", "S3 access key.")
 	flag.String("s3SecretKey", "", "S3 secret key.")
@@ -111,6 +112,7 @@ func processVars() {
 	flag.Parse()
 
 	viper.BindPFlag("targetDirs", flag.CommandLine.Lookup("targetDirs"))
+	viper.BindPFlag("s3Insecure", flag.CommandLine.Lookup("s3Insecure"))
 	viper.BindPFlag("s3Host", flag.CommandLine.Lookup("s3Host"))
 	viper.BindPFlag("s3AccessKey", flag.CommandLine.Lookup("s3AccessKey"))
 	viper.BindPFlag("s3SecretKey", flag.CommandLine.Lookup("s3SecretKey"))
@@ -128,4 +130,5 @@ func processVars() {
 	viper.BindEnv("remoteWorkerCount")
 
 	viper.SetDefault("remoteWorkerCount", 5)
+	viper.SetDefault("s3Insecure", false)
 }
