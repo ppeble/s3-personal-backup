@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup"
 )
 
 type backupLogger interface {

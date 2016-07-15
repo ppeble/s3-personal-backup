@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup"
 )
 
 type RemoteActionWorker struct {

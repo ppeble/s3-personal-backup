@@ -2,36 +2,33 @@ package reporter
 
 import (
 	"log"
-	"time"
 
-	"github.com/ptrimble/dreamhost-personal-backup/backup"
+	"github.com/ptrimble/dreamhost-personal-backup"
 )
 
-type reporter struct {
+type dryRunReporter struct {
 	in     <-chan backup.LogEntry
 	logger *log.Logger
 
 	entries []backup.LogEntry
-	start   time.Time
 
 	pushCount, removeCount int
 }
 
-func NewReporter(
+func NewDryRunReporter(
 	in <-chan backup.LogEntry,
 	l *log.Logger,
-) reporter {
-	return reporter{
+) dryRunReporter {
+	return dryRunReporter{
 		in:          in,
 		logger:      l,
 		entries:     make([]backup.LogEntry, 0),
-		start:       time.Now(),
 		pushCount:   0,
 		removeCount: 0,
 	}
 }
 
-func (r *reporter) Run() {
+func (r *dryRunReporter) Run() {
 	for {
 		entry := <-r.in
 		r.entries = append(r.entries, entry)
@@ -44,19 +41,12 @@ func (r *reporter) Run() {
 	}
 }
 
-//TODO Add some kind of timestamp in here, this is what we will probably want to be
-// printed to a separate file, it'll be nice to have some indication
-func (r *reporter) Print() {
-	runDuration := time.Since(r.start)
-	timePerFile := runDuration.Seconds() / float64(len(r.entries))
-
-	r.logger.Println("Backup Report")
+func (r *dryRunReporter) Print() {
+	r.logger.Println("Dry Run Report")
 	r.logger.Println("-------------------------------")
-	r.logger.Printf("Total run time (in minutes): %d\n", int(runDuration.Minutes()))
 	r.logger.Printf("Total files processed: %d\n", len(r.entries))
-	r.logger.Printf("Time per file (in seconds): %.4f\n", timePerFile)
-	r.logger.Printf("Files added to remote: %d\n", r.pushCount)
-	r.logger.Printf("Files removed from remote: %d\n", r.removeCount)
+	r.logger.Printf("Files that would be added to remote: %d\n", r.pushCount)
+	r.logger.Printf("Files that would be removed from remote: %d\n", r.removeCount)
 	r.logger.Println("")
 	r.logger.Println("File Details")
 	r.logger.Println("-------------------------------")
