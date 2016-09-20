@@ -12,12 +12,12 @@ test:
 vet:
 	go vet ./...
 
-run: build
-	cp build/dreamhost-personal-backup dreamhost-personal-backup
+run:
 	./dreamhost-personal-backup
 
 build: clean
-	go build -o build/dreamhost-personal-backup ./cmd
+	go build -o build/dreamhost-personal-backup ./cmd/dreamhost-personal-backup
+	cp build/dreamhost-personal-backup dreamhost-personal-backup
 
 clean:
 	rm -rf build
