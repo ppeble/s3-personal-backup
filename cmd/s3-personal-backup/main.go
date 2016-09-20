@@ -16,54 +16,25 @@ import (
 	"github.com/ptrimble/dreamhost-personal-backup/worker"
 )
 
-func main() {
+var s3Client *minio.s3Client
+var workerWg sync.WaitGroup
+
+func init() {
 	processVars()
+	s3Client = createS3Client()
+	remoteActionChan = make(chan backup.RemoteAction, 20)
+}
 
-	s3Client, err := minio.New(
-		viper.GetString("s3Host"),
-		viper.GetString("s3AccessKey"),
-		viper.GetString("s3SecretKey"),
-		(viper.GetBool("s3Insecure") == false),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	var workerWg sync.WaitGroup
+func main() {
+	s3Client := createS3Client()
 	remoteActionChan := make(chan backup.RemoteAction, 20)
 
-	reportChan := make(chan backup.LogEntry)
-	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
+	reportGenerator, reportChan := startReporter()
 
-	var reportGenerator backup.Reporter
-	if viper.GetBool("dryRun") {
-		r := reporter.NewDryRunReporter(reportChan, reportOut)
-		reportGenerator = &r
-	} else {
-		r := reporter.NewReporter(reportChan, reportOut)
-		reportGenerator = &r
-	}
-
-	go reportGenerator.Run()
+	localfileprocessors := createlocalfileprocessors()
+	remotefileprocessor := createremotefileprocessor()
 
 	logger := logger.NewLogger(os.Stdout, reportChan, &workerWg)
-
-	targetDirs := strings.Split(viper.GetString("targetDirs"), ",")
-	localFileProcessors := make([]backup.FileGatherer, len(targetDirs))
-	for i, targetDir := range targetDirs {
-		p := backup.NewLocalFileProcessor(targetDir)
-		localFileProcessors[i] = &p
-	}
-
-	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
-		viper.GetString("s3BucketName"),
-		s3Client.ListObjects,
-		s3Client.RemoveObject,
-		s3Client.FPutObject,
-	)
-	if err != nil {
-		panic(err)
-	}
 
 	for i := 0; i < viper.GetInt("remoteWorkerCount"); i++ {
 		if viper.GetBool("dryRun") {
@@ -131,4 +102,61 @@ func processVars() {
 
 	viper.SetDefault("remoteWorkerCount", 5)
 	viper.SetDefault("s3Insecure", false)
+}
+
+func createS3Client() *minio.s3Client {
+	s3Client, err := minio.New(
+		viper.GetString("s3Host"),
+		viper.GetString("s3AccessKey"),
+		viper.GetString("s3SecretKey"),
+		(viper.GetBool("s3Insecure") == false),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return s3Client
+}
+
+func startReporter() (backup.Reporter, chan backup.LogEntry) {
+	reportChan := make(chan backup.LogEntry)
+	reportOut := log.New(os.Stdout, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
+
+	var reportGenerator backup.Reporter
+	if viper.GetBool("dryRun") {
+		r := reporter.NewDryRunReporter(reportChan, reportOut)
+		reportGenerator = &r
+	} else {
+		r := reporter.NewReporter(reportChan, reportOut)
+		reportGenerator = &r
+	}
+
+	go reportGenerator.Run()
+
+	return reportGenerator, reportChan
+}
+
+func createLocalFileProcessors() []backup.FileGatherer {
+	targetDirs := strings.Split(viper.GetString("targetDirs"), ",")
+	localFileProcessors := make([]backup.FileGatherer, len(targetDirs))
+	for i, targetDir := range targetDirs {
+		p := backup.NewLocalFileProcessor(targetDir)
+		localFileProcessors[i] = &p
+	}
+
+	return localFileProcessors
+}
+
+func createRemoteFileProcessor() backup.RemoteFileProcessor {
+	remoteFileProcessor, err := backup.NewRemoteFileProcessor(
+		viper.GetString("s3BucketName"),
+		s3Client.ListObjects,
+		s3Client.RemoveObject,
+		s3Client.FPutObject,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return remoteFileProcessor
 }

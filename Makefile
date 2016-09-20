@@ -9,6 +9,10 @@ test:
 	@go list -f '{{.Dir}}/test.cov' "$(PACKAGES)" \
 		| while read coverage ; do go tool cover -func "$$coverage" ; done \
 		| awk '$$3 !~ /^100/ { print; gaps++ } END { exit gaps }' ;
+
+integration-test:
+	bash -c ". ./internal/env/regular.env; gucumber --tags=@regular"
+
 vet:
 	go vet ./...
 
