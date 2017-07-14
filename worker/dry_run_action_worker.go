@@ -3,7 +3,7 @@ package worker
 import (
 	"sync"
 
-	"github.com/ptrimble/dreamhost-personal-backup"
+	"github.com/ppeble/dreamhost-personal-backup"
 )
 
 type DryRunActionWorker struct {

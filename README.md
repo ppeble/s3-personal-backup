@@ -1,4 +1,4 @@
-# dreamhost-personal-backup [![Build Status](https://travis-ci.org/ptrimble/dreamhost-personal-backup.svg?branch=master)](https://travis-ci.org/ptrimble/dreamhost-personal-backup)
+# dreamhost-personal-backup [![Build Status](https://travis-ci.org/ppeble/dreamhost-personal-backup.svg?branch=master)](https://travis-ci.org/ppeble/dreamhost-personal-backup)
 
 A personal backup tool written in Go. This project writes files to your favorite S3-compatible
 storage service.

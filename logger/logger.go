@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/ptrimble/dreamhost-personal-backup"
+	"github.com/ppeble/dreamhost-personal-backup"
 )
 
 const (
