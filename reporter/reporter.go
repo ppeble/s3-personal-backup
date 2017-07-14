@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/ptrimble/dreamhost-personal-backup"
+	"github.com/ppeble/dreamhost-personal-backup"
 )
 
 type reporter struct {
