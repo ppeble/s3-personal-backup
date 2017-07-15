@@ -1,0 +1,11 @@
+[[constraint]]
+  name = "github.com/minio/minio-go"
+  revision = "1.0.1-38-ge9fd7b8"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/spf13/pflag"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/spf13/viper"
