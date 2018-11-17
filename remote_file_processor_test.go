@@ -17,7 +17,7 @@ type RemoteProcessorTestSuite struct {
 	bucket     string
 	listFunc   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
 	removeFunc func(string, string) error
-	putFunc    func(string, string, string, string) (int64, error)
+	putFunc    func(string, string, string, minio.PutObjectOptions) (int64, error)
 }
 
 func (s *RemoteProcessorTestSuite) SetupTest() {
@@ -30,7 +30,7 @@ func (s *RemoteProcessorTestSuite) SetupTest() {
 	}
 
 	s.removeFunc = func(bucket, file string) error { return nil }
-	s.putFunc = func(bucket, file, filepath, contentType string) (int64, error) { return 0, nil }
+	s.putFunc = func(bucket, file, filepath string, opts minio.PutObjectOptions) (int64, error) { return 0, nil }
 }
 
 func (s *RemoteProcessorTestSuite) Test_Gather_CallsListRemoteObjects() {
@@ -174,11 +174,11 @@ func (s *RemoteProcessorTestSuite) Test_Put_Happy() {
 	called := false
 	expectedFile := "/tmp/test"
 
-	putFunc := func(bucket, fileName, filePath, contentType string) (int64, error) {
+	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
 		s.Equal(s.bucket, bucket)
 		s.Equal(expectedFile, fileName)
 		s.Equal(expectedFile, filePath)
-		s.Equal("", contentType)
+		s.Equal("", opts.ContentType)
 
 		called = true
 		return 0, nil
@@ -197,7 +197,7 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorOnFailure() {
 	expectedFile := "/tmp/test"
 	expectedErr := errors.New("asplode")
 
-	putFunc := func(bucket, fileName, filePath, contentType string) (int64, error) {
+	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
 		called = true
 		return 0, expectedErr
 	}
@@ -216,7 +216,7 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorIfFileIsMissing() {
 	expectedFile := ""
 	expectedErr := errors.New("'put' error: target file cannot be missing")
 
-	putFunc := func(bucket, fileName, filePath, contentType string) (int64, error) {
+	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
 		called = true
 		return 0, nil
 	}

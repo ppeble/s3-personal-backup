@@ -12,14 +12,14 @@ type RemoteFileProcessor struct {
 
 	list   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
 	remove func(string, string) error
-	put    func(string, string, string, string) (int64, error)
+	put    func(string, string, string, minio.PutObjectOptions) (int64, error)
 }
 
 func NewRemoteFileProcessor(
 	b string,
 	l func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo,
 	r func(string, string) error,
-	p func(string, string, string, string) (int64, error),
+	p func(string, string, string, minio.PutObjectOptions) (int64, error),
 ) (RemoteFileProcessor, error) {
 	if b == "" {
 		return RemoteFileProcessor{}, errors.New("'NewRemoteFileProcessor' error: bucket cannot be missing")
@@ -67,6 +67,8 @@ func (p *RemoteFileProcessor) Put(f string) (err error) {
 	}
 
 	contentType := "" // A blank will cause the type to be auto-detected by the lib
-	_, err = p.put(p.bucket, f, f, contentType)
+	_, err = p.put(p.bucket, f, f, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
 	return
 }
