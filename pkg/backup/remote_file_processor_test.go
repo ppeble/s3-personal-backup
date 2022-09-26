@@ -1,10 +1,11 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	minio "github.com/minio/minio-go"
+	minio "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,34 +16,36 @@ func TestRemoteProcessorTestSuite(t *testing.T) {
 type RemoteProcessorTestSuite struct {
 	suite.Suite
 	bucket     string
-	listFunc   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
-	removeFunc func(string, string) error
-	putFunc    func(string, string, string, minio.PutObjectOptions) (int64, error)
+	listFunc   func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo
+	removeFunc func(context.Context, string, string, minio.RemoveObjectOptions) error
+	putFunc    func(context.Context, string, string, string, minio.PutObjectOptions) (minio.UploadInfo, error)
 }
 
 func (s *RemoteProcessorTestSuite) SetupTest() {
 	s.bucket = "testBucket"
 
-	s.listFunc = func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
+	s.listFunc = func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo)
 		defer close(objectCh)
 		return objectCh
 	}
 
-	s.removeFunc = func(bucket, file string) error { return nil }
-	s.putFunc = func(bucket, file, filepath string, opts minio.PutObjectOptions) (int64, error) { return 0, nil }
+	s.removeFunc = func(context.Context, string, string, minio.RemoveObjectOptions) error { return nil }
+	s.putFunc = func(context.Context, string, string, string, minio.PutObjectOptions) (minio.UploadInfo, error) {
+		return minio.UploadInfo{}, nil
+	}
 }
 
 func (s *RemoteProcessorTestSuite) Test_Gather_CallsListRemoteObjects() {
 	called := false
 
-	listFunc := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
+	listFunc := func(_ context.Context, bucket string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo, 1)
 		defer close(objectCh)
 
 		s.Equal(s.bucket, bucket)
-		s.Equal("", prefix)
-		s.Equal(true, isRecursive)
+		s.Equal("", opts.Prefix)
+		s.Equal(true, opts.Recursive)
 
 		called = true
 
@@ -60,7 +63,7 @@ func (s *RemoteProcessorTestSuite) Test_Gather_ReturnsErrorOnlyForFailedObjects(
 	called := false
 	expectedErr := errors.New("asplode")
 
-	listFunc := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
+	listFunc := func(_ context.Context, bucket string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo, 1)
 		defer close(objectCh)
 
@@ -87,7 +90,7 @@ func (s *RemoteProcessorTestSuite) Test_New_ErrorBlankBucketName() {
 }
 
 func (s *RemoteProcessorTestSuite) Test_Gather_SingleFile() {
-	listFunc := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
+	listFunc := func(_ context.Context, bucket string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo, 1)
 		defer close(objectCh)
 
@@ -107,7 +110,7 @@ func (s *RemoteProcessorTestSuite) Test_Gather_SingleFile() {
 }
 
 func (s *RemoteProcessorTestSuite) Test_Gather_MultipleFiles() {
-	listFunc := func(bucket, prefix string, isRecursive bool, doneCh <-chan struct{}) <-chan minio.ObjectInfo {
+	listFunc := func(_ context.Context, bucket string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 		objectCh := make(chan minio.ObjectInfo, 3)
 		defer close(objectCh)
 
@@ -140,7 +143,7 @@ func (s *RemoteProcessorTestSuite) Test_Gather_MultipleFiles() {
 
 func (s *RemoteProcessorTestSuite) Test_Remove_Happy() {
 	called := false
-	removeFunc := func(bucket, file string) error {
+	removeFunc := func(_ context.Context, bucket, file string, _ minio.RemoveObjectOptions) error {
 		s.Equal(s.bucket, bucket)
 		s.Equal("test", file)
 		called = true
@@ -157,7 +160,7 @@ func (s *RemoteProcessorTestSuite) Test_Remove_Happy() {
 func (s *RemoteProcessorTestSuite) Test_Remove_Error() {
 	called := false
 	expectedErr := errors.New("asplode")
-	removeFunc := func(bucket, file string) error {
+	removeFunc := func(_ context.Context, bucket, file string, _ minio.RemoveObjectOptions) error {
 		called = true
 		return expectedErr
 	}
@@ -174,14 +177,14 @@ func (s *RemoteProcessorTestSuite) Test_Put_Happy() {
 	called := false
 	expectedFile := "/tmp/test"
 
-	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
+	putFunc := func(_ context.Context, bucket, fileName, filePath string, opts minio.PutObjectOptions) (minio.UploadInfo, error) {
 		s.Equal(s.bucket, bucket)
 		s.Equal(expectedFile, fileName)
 		s.Equal(expectedFile, filePath)
 		s.Equal("", opts.ContentType)
 
 		called = true
-		return 0, nil
+		return minio.UploadInfo{}, nil
 	}
 
 	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)
@@ -197,9 +200,9 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorOnFailure() {
 	expectedFile := "/tmp/test"
 	expectedErr := errors.New("asplode")
 
-	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
+	putFunc := func(_ context.Context, bucket, fileName, filePath string, opts minio.PutObjectOptions) (minio.UploadInfo, error) {
 		called = true
-		return 0, expectedErr
+		return minio.UploadInfo{}, expectedErr
 	}
 
 	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)
@@ -216,9 +219,9 @@ func (s *RemoteProcessorTestSuite) Test_Put_ReturnsErrorIfFileIsMissing() {
 	expectedFile := ""
 	expectedErr := errors.New("'put' error: target file cannot be missing")
 
-	putFunc := func(bucket, fileName, filePath string, opts minio.PutObjectOptions) (int64, error) {
+	putFunc := func(_ context.Context, bucket, fileName, filePath string, opts minio.PutObjectOptions) (minio.UploadInfo, error) {
 		called = true
-		return 0, nil
+		return minio.UploadInfo{}, nil
 	}
 
 	processor, _ := NewRemoteFileProcessor(s.bucket, s.listFunc, s.removeFunc, putFunc)

@@ -1,10 +1,8 @@
 language: go
 
 go:
-  - 1.17.x
   - 1.18.x
-  - tip
+  - 1.19.x
 
 script:
-  - env GO111MODULE=on go build
-  - env GO111MODULE=on go test
+  - make test

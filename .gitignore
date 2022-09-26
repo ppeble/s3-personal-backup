@@ -26,3 +26,5 @@ _testmain.go
 *.prof
 *.test
 *.cov
+
+.go-version
