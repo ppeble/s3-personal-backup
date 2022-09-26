@@ -7,13 +7,18 @@ This project serves as an excuse for me to solve a problem in Go. I know that
 I could use any number of existing products to address my backup needs but this is
 way more fun.
 
-*Please* do not use this project for anything that is mission-critical. I back up
-my music and personal documents to a remote server as another duplicate in a myriad
-of backup locations. I don't rely on just this backup.
+What I wanted was the most simple "put copies of files in s3 recursively" solution. I didn't
+want encryption. I didn't want versioning. I wanted to point at an s3-compatible solution
+and make a local copy for backup purposes so I could download individual files or directories
+as it suited me.
 
 There is no versioning. This does not back up symlinks or directories. It simply
 walks recursively through from the supplied directory and pushes up every file to
 the remote S3 storage. That's it!
+
+*Please* do not use this project for anything that is mission-critical. I back up
+my music and personal documents to a remote server as another duplicate in a myriad
+of backup locations. I don't rely on just this backup.
 
 ## Usage
 

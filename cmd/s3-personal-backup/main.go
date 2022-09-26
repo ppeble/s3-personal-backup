@@ -6,7 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -19,11 +20,16 @@ import (
 func main() {
 	processVars()
 
-	s3Client, err := minio.NewV2(
+	s3Client, err := minio.New(
 		viper.GetString("s3Host"),
-		viper.GetString("s3AccessKey"),
-		viper.GetString("s3SecretKey"),
-		false,
+		&minio.Options{
+			Creds: credentials.NewStaticV4(
+				viper.GetString("s3AccessKey"),
+				viper.GetString("s3SecretKey"),
+				"",
+			),
+			Secure: true,
+		},
 	)
 	if err != nil {
 		panic(err)

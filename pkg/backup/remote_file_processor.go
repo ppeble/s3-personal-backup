@@ -1,25 +1,27 @@
 package backup
 
 import (
+	"context"
 	"errors"
 
-	"github.com/minio/minio-go"
+	minio "github.com/minio/minio-go/v7"
 )
 
 type RemoteFileProcessor struct {
 	bucket   string
 	fileData FileData
 
-	list   func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo
-	remove func(string, string) error
-	put    func(string, string, string, minio.PutObjectOptions) (int64, error)
+	list   func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo
+	remove func(context.Context, string, string, minio.RemoveObjectOptions) error
+	put    func(context.Context, string, string, string, minio.PutObjectOptions) (minio.UploadInfo, error)
+	//put func(context.Context, bucketName, objectName, filePath string, opts PutObjectOptions) (info minio.UploadInfo, err error)
 }
 
 func NewRemoteFileProcessor(
 	b string,
-	l func(string, string, bool, <-chan struct{}) <-chan minio.ObjectInfo,
-	r func(string, string) error,
-	p func(string, string, string, minio.PutObjectOptions) (int64, error),
+	l func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo,
+	r func(context.Context, string, string, minio.RemoveObjectOptions) error,
+	p func(context.Context, string, string, string, minio.PutObjectOptions) (minio.UploadInfo, error),
 ) (RemoteFileProcessor, error) {
 	if b == "" {
 		return RemoteFileProcessor{}, errors.New("'NewRemoteFileProcessor' error: bucket cannot be missing")
@@ -35,16 +37,7 @@ func NewRemoteFileProcessor(
 }
 
 func (p *RemoteFileProcessor) Gather() (data FileData, err error) {
-	// Create a done channel to control 'ListObjects' go routine.
-	doneCh := make(chan struct{})
-
-	// Indicate to our routine to exit cleanly upon return.
-	defer close(doneCh)
-
-	prefix := ""
-	isRecursive := true
-	objectCh := p.list(p.bucket, prefix, isRecursive, doneCh)
-	for object := range objectCh {
+	for object := range p.list(context.Background(), p.bucket, minio.ListObjectsOptions{Prefix: "", Recursive: true}) {
 		if object.Err != nil {
 			return nil, object.Err
 		}
@@ -55,9 +48,8 @@ func (p *RemoteFileProcessor) Gather() (data FileData, err error) {
 	return p.fileData, nil
 }
 
-func (p *RemoteFileProcessor) Remove(f string) (err error) {
-	err = p.remove(p.bucket, f)
-	return
+func (p *RemoteFileProcessor) Remove(f string) error {
+	return p.remove(context.Background(), p.bucket, f, minio.RemoveObjectOptions{})
 }
 
 func (p *RemoteFileProcessor) Put(f string) (err error) {
@@ -66,9 +58,9 @@ func (p *RemoteFileProcessor) Put(f string) (err error) {
 		return
 	}
 
-	contentType := "" // A blank will cause the type to be auto-detected by the lib
-	_, err = p.put(p.bucket, f, f, minio.PutObjectOptions{
-		ContentType: contentType,
+	// We ignore the return file info, we don't need it for now
+	_, err = p.put(context.Background(), p.bucket, f, f, minio.PutObjectOptions{
+		ContentType: "", // A blank will cause the type to be auto-detected by the lib
 	})
 	return
 }

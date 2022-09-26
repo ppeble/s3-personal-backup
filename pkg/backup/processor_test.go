@@ -189,7 +189,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InBoth_NotEqual() {
 
 	go func() {
 		action := <-s.remoteAction
-		s.Equal(PUSH, action.Type)
+		s.Equal(ActionType(PUSH), action.Type)
 		s.Equal("file", action.File.Name)
 		s.wg.Done()
 	}()
@@ -205,7 +205,7 @@ func (s *ProcessorTestSuite) Test_processLocalVsRemote_InLocal_NotInRemote() {
 
 	go func() {
 		action := <-s.remoteAction
-		s.Equal(PUSH, action.Type)
+		s.Equal(ActionType(PUSH), action.Type)
 		s.Equal("file", action.File.Name)
 		s.wg.Done()
 	}()
@@ -229,7 +229,7 @@ func (s *ProcessorTestSuite) Test_processRemoteVsLocal_InRemote_NotInLocal() {
 
 	go func() {
 		action := <-s.remoteAction
-		s.Equal(REMOVE, action.Type)
+		s.Equal(ActionType(REMOVE), action.Type)
 		s.Equal("file", action.File.Name)
 		s.wg.Done()
 	}()
