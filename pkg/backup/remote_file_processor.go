@@ -14,7 +14,6 @@ type RemoteFileProcessor struct {
 	list   func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo
 	remove func(context.Context, string, string, minio.RemoveObjectOptions) error
 	put    func(context.Context, string, string, string, minio.PutObjectOptions) (minio.UploadInfo, error)
-	//put func(context.Context, bucketName, objectName, filePath string, opts PutObjectOptions) (info minio.UploadInfo, err error)
 }
 
 func NewRemoteFileProcessor(

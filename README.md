@@ -7,10 +7,10 @@ This project serves as an excuse for me to solve a problem in Go. I know that
 I could use any number of existing products to address my backup needs but this is
 way more fun.
 
-What I wanted was the most simple "put copies of files in s3 recursively" solution. I didn't
-want encryption. I didn't want versioning. I wanted to point at an s3-compatible solution
-and make a local copy for backup purposes so I could download individual files or directories
-as it suited me.
+What I want is a simple and idempotent "put copies from a directory in s3 recursively"
+solution. I don't want encryption. I don't want versioning. I want to point at an s3-compatible
+solution and make a copy from my local system for backup purposes so I could download individual
+files or directories as it suited me.
 
 There is no versioning. This does not back up symlinks or directories. It simply
 walks recursively through from the supplied directory and pushes up every file to
@@ -30,7 +30,7 @@ This project assumes that you have already set up a user on your preferred S3-co
 
 The `s3_personal_backup` binary requires the following information:
 
-* backup target directories - specified via the `--targetDirs <dir>` flag or by setting the `PERSONAL_BACKUP_TARGETDIRS` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/phil/documents,/home/phil/music,/home/phil/pictures'
+* backup target directories - specified via the `--targetDirs <dir>` flag or by setting the `PERSONAL_BACKUP_TARGETDIRS` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/<user>/documents,/home/<user>/music,/home/<user>/pictures,/media/dir,/etc/dir'
 * S3 host - specified via the `--s3Host <host>` flag or by setting the `PERSONAL_BACKUP_S3HOST` env variable
 * S3 access key - specified via the `--s3AccessKey <key>` flag or by setting the `PERSONAL_BACKUP_S3ACCESSKEY` env variable
 * S3 secret key - specified via the `--s3SecretKey <key>` flag or by setting the `PERSONAL_BACKUP_S3SECRETKEY` env variable
@@ -38,7 +38,7 @@ The `s3_personal_backup` binary requires the following information:
 
 In addition, there are optional fields:
 
-* remote worker count - number of workers to run in parallel to process actions on the remote host. Used currently to (primitively) limit bandwidth usage. Fewer workers means fewer simultaneous actions (like uploading) run against the S3 host. Specified via the `--remoteWorkerCount <count>` flag or the `PERSONAL_BACKUP_REMOTEWORKERCOUNT` env variable
+* remote worker count - DEFAULT 5 - number of workers to run in parallel to process actions on the remote host. Used currently to (primitively) limit bandwidth usage. Fewer workers means fewer simultaneous actions (like uploading) run against the S3 host. Specified via the `--remoteWorkerCount <count>` flag or the `PERSONAL_BACKUP_REMOTEWORKERCOUNT` env variable
 
 In all instances the command line flag will take priority over the environment variable.
 
