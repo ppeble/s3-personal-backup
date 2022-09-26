@@ -3,7 +3,7 @@ package reporter
 import (
 	"log"
 
-	"github.com/ppeble/dreamhost-personal-backup"
+	"github.com/ppeble/s3-personal-backup/pkg/backup"
 )
 
 type dryRunReporter struct {
