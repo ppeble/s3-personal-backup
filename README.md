@@ -22,7 +22,13 @@ of backup locations. I don't rely on just this backup.
 
 ## Usage
 
-<need to add `go get` stuff here, not ready for it yet>
+Install to `$GOPATH/bin` by running:
+
+```
+go install github.com/ppeble/s3-personal-backup/cmd/s3-personal-backup
+```
+
+You can now find the executable in `$GOPATH/bin/s3-personal-backup`.
 
 ### Configuration
 
