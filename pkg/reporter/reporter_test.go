@@ -7,14 +7,14 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ppeble/dreamhost-personal-backup"
+	"github.com/ppeble/s3-personal-backup/pkg/backup"
 )
 
-func TestDryRunReporterTestSuite(t *testing.T) {
-	suite.Run(t, new(DryRunReporterTestSuite))
+func TestReporterTestSuite(t *testing.T) {
+	suite.Run(t, new(ReporterTestSuite))
 }
 
-type DryRunReporterTestSuite struct {
+type ReporterTestSuite struct {
 	suite.Suite
 
 	sliceLogger *sliceLogger
@@ -22,23 +22,23 @@ type DryRunReporterTestSuite struct {
 	in     chan backup.LogEntry
 	logger *log.Logger
 
-	reporter dryRunReporter
+	reporter reporter
 
 	messageIterator int
 }
 
-func (s *DryRunReporterTestSuite) SetupTest() {
+func (s *ReporterTestSuite) SetupTest() {
 	s.sliceLogger = &sliceLogger{
 		messages: make([]string, 0),
 	}
 
 	s.in = make(chan backup.LogEntry)
 	s.logger = log.New(s.sliceLogger, "REPORT: ", log.Ldate|log.Ltime|log.LUTC)
-	s.reporter = NewDryRunReporter(s.in, s.logger)
+	s.reporter = NewReporter(s.in, s.logger)
 	s.messageIterator = 0
 }
 
-func (s *DryRunReporterTestSuite) Test_ReadsFromChannelAndLogs() {
+func (s *ReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	go s.reporter.Run()
 
 	expectedEntry := backup.LogEntry{Message: "test", File: "file1"}
@@ -50,7 +50,7 @@ func (s *DryRunReporterTestSuite) Test_ReadsFromChannelAndLogs() {
 	s.Equal(s.reporter.entries[0], expectedEntry)
 }
 
-func (s *DryRunReporterTestSuite) Test_Print_GeneratesReport() {
+func (s *ReporterTestSuite) Test_Print_GeneratesReport() {
 	go s.reporter.Run()
 
 	s.in <- backup.LogEntry{Message: "test1", File: "file1", ActionType: backup.PUSH}
@@ -63,11 +63,13 @@ func (s *DryRunReporterTestSuite) Test_Print_GeneratesReport() {
 
 	s.reporter.Print()
 
-	s.contains("Dry Run Report")
+	s.contains("Backup Report")
 	s.contains("-------------------------------")
+	s.contains("Total run time (in minutes): 0")
 	s.contains("Total files processed: 4")
-	s.contains("Files that would be added to remote: 3")
-	s.contains("Files that would be removed from remote: 1")
+	s.contains("Time per file (in seconds):") // The time per file is highly variable
+	s.contains("Files added to remote: 3")
+	s.contains("Files removed from remote: 1")
 	s.contains("")
 	s.contains("File Details")
 	s.contains("-------------------------------")
@@ -78,7 +80,7 @@ func (s *DryRunReporterTestSuite) Test_Print_GeneratesReport() {
 	s.contains("")
 }
 
-func (s *DryRunReporterTestSuite) contains(expected string) {
+func (s *ReporterTestSuite) contains(expected string) {
 	s.Contains(s.sliceLogger.messages[s.messageIterator], expected)
 	s.messageIterator++
 }

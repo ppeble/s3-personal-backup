@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ppeble/dreamhost-personal-backup"
+	"github.com/ppeble/s3-personal-backup/pkg/backup"
 )
 
 func TestRemoteActionWorkerTestSuite(t *testing.T) {
