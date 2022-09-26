@@ -3,6 +3,7 @@ language: go
 go:
   - 1.17.x
   - 1.18.x
+  - 1.19.x
 
 script:
   - make test
