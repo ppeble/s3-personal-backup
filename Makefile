@@ -1,6 +1,6 @@
 default: test
 
-PACKAGES:="./. ./worker ./logger ./reporter"
+PACKAGES:="./pkg/backup ./pkg/worker ./pkg/logger ./pkg/reporter"
 
 test: vet
 	@go list -f '{{.Dir}}/test.cov {{.ImportPath}}' "$(PACKAGES)"  \
@@ -14,14 +14,14 @@ vet:
 	go vet ./...
 
 run: build
-	./dreamhost-personal-backup
+	./s3-personal-backup
 
 build: clean
-	go build -o build/dreamhost-personal-backup ./cmd/dreamhost-personal-backup
-	cp build/dreamhost-personal-backup dreamhost-personal-backup
+	go build -o build/s3-personal-backup ./cmd/s3-personal-backup
+	cp build/s3-personal-backup s3-personal-backup
 
 clean:
 	rm -rf build
-	rm -rf dreamhost-personal-backup
+	rm -rf s3-personal-backup
 
 .PHONY: default test vet build clean run

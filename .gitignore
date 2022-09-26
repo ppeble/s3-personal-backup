@@ -2,7 +2,7 @@
 *.o
 *.a
 *.so
-dreamhost-personal-backup
+s3-personal-backup
 
 # Folders
 _obj

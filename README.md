@@ -1,4 +1,4 @@
-# dreamhost-personal-backup [![Build Status](https://travis-ci.org/ppeble/dreamhost-personal-backup.svg?branch=master)](https://travis-ci.org/ppeble/dreamhost-personal-backup)
+# s3-personal-backup
 
 A personal backup tool written in Go. This project writes files to your favorite S3-compatible
 storage service.
@@ -23,7 +23,7 @@ the remote S3 storage. That's it!
 
 This project assumes that you have already set up a user on your preferred S3-compatible host.
 
-The `dreamhost_personal_backup` binary requires the following information:
+The `s3_personal_backup` binary requires the following information:
 
 * backup target directories - specified via the `--targetDirs <dir>` flag or by setting the `PERSONAL_BACKUP_TARGETDIRS` env variable. Should be a comma separated list of full directory paths to back up. Ex: '/home/phil/documents,/home/phil/music,/home/phil/pictures'
 * S3 host - specified via the `--s3Host <host>` flag or by setting the `PERSONAL_BACKUP_S3HOST` env variable
@@ -46,4 +46,3 @@ In all instances the command line flag will take priority over the environment v
 ## Credits
 
 * I used the [minio-go](https://github.com/minio/minio-go) client
-* I used the documentation found at the [DreamObjects Wiki](http://wiki.dreamhost.com/DreamObjects_Overview_and_FAQs) for system-specific information on Dreamhost infrastructure
