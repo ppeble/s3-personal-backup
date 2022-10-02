@@ -30,6 +30,7 @@ func NewProcessor(
 }
 
 func (p processor) Process() (err error) {
+	//TODO should I do both gathering in separate goroutines here, like I do with the section below?
 	localFiles, remoteFiles, err := p.runGatherers()
 	if err != nil {
 		return err
@@ -43,6 +44,7 @@ func (p processor) Process() (err error) {
 }
 
 func (p processor) runGatherers() (localFiles, remoteFiles FileData, err error) {
+	//TODO These should be run in parallel. Only return when both are done without errors
 	localFiles, err = p.runLocalGatherers(p.localGatherers)
 	if err != nil {
 		p.logger.Error(LogEntry{

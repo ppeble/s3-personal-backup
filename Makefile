@@ -13,8 +13,8 @@ test: vet
 vet:
 	go vet ./...
 
-run: build
-	./s3-personal-backup
+run:
+	godotenv go run ./cmd/s3-personal-backup
 
 build: clean
 	go build -o build/s3-personal-backup ./cmd/s3-personal-backup

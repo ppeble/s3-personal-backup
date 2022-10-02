@@ -50,13 +50,15 @@ func (w RemoteActionWorker) push(file backup.File) {
 	err := w.putToRemote(file.Name)
 	if err != nil {
 		w.logger.Error(backup.LogEntry{
-			Message: fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
-			File:    file.Name,
+			Message:    fmt.Sprintf("unable to push to remote for file '%s', error: '%s'", file, err.Error()),
+			File:       file.Name,
+			ActionType: backup.PUSH,
 		})
 	} else {
 		w.logger.Info(backup.LogEntry{
-			Message: fmt.Sprintf("%s pushed to remote", file),
-			File:    file.Name,
+			Message:    fmt.Sprintf("%s pushed to remote", file),
+			File:       file.Name,
+			ActionType: backup.PUSH,
 		})
 	}
 }
@@ -67,14 +69,16 @@ func (w RemoteActionWorker) remove(file backup.File) {
 	err := w.removeFromRemote(file.Name)
 	if err != nil {
 		entry := backup.LogEntry{
-			Message: fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
-			File:    file.Name,
+			Message:    fmt.Sprintf("%s not found locally but unable to remove from remote, error: '%s'", file, err.Error()),
+			File:       file.Name,
+			ActionType: backup.REMOVE,
 		}
 		w.logger.Error(entry)
 	} else {
 		entry := backup.LogEntry{
-			Message: fmt.Sprintf("%s not found locally, removing from remote", file),
-			File:    file.Name,
+			Message:    fmt.Sprintf("%s not found locally, removing from remote", file),
+			File:       file.Name,
+			ActionType: backup.REMOVE,
 		}
 		w.logger.Info(entry)
 	}

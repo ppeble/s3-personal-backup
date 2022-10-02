@@ -10,5 +10,5 @@ type LogEntry struct {
 }
 
 func (l LogEntry) String() string {
-	return fmt.Sprintf("file: '%s' - action: '%s' - message: '%s'", l.File, l.ActionType, l.Message)
+	return fmt.Sprintf("file: '%s' - action: '%v' - message: '%s'", l.File, l.ActionType, l.Message)
 }

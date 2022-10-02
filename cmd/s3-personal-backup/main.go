@@ -20,6 +20,9 @@ import (
 func main() {
 	processVars()
 
+	// Maybe I need an s3 client for each worker process?
+	// Maybe I can't have one at the top that I pass to
+	// every routine
 	s3Client, err := minio.New(
 		viper.GetString("s3Host"),
 		&minio.Options{
